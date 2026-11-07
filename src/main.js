@@ -5,8 +5,9 @@ import { unlockAudio } from "./audio.js";
 import { requestLevel, level, LEVEL_TOL } from "./level.js";
 import { loadSettings, saveSettings } from "./config.js";
 import { liveFrame, liveInit } from "./live.js";
-import { squatStart, squatFrame, squatEndSet } from "./squat.js";
-import { benchStart, benchFrame, benchEndSet } from "./bench.js";
+import { squatStart, squatFrame, squatEndSet, squatDebug, squatHistory } from "./squat.js";
+import { benchStart, benchFrame, benchEndSet, benchDebug, benchHistory } from "./bench.js";
+import { startRecording, stopRecording, recordFrame, isRecording, shareLast } from "./recorder.js";
 import { resetProfile } from "./profile.js";
 
 const $ = id => document.getElementById(id);
@@ -66,13 +67,34 @@ async function enter(m) {
   $("live").hidden = m !== "live"; $("squat").hidden = m !== "squat"; $("bench").hidden = m !== "bench";
   $("statusChip").hidden = m === "live";
   clear();
-  if (m === "live") setHandler(liveFrame);
-  if (m === "squat") { squatStart(st); setHandler(squatFrame); }
-  if (m === "bench") { benchStart(st); setHandler(benchFrame); }
+  const withRec = (fn, dbg) => (res, lm, ts) => { fn(res, lm, ts); if (isRecording()) recordFrame(lm, ts, dbg?.()); };
+  if (m === "live") setHandler(withRec(liveFrame));
+  if (m === "squat") { squatStart(st); setHandler(withRec(squatFrame, squatDebug)); }
+  if (m === "bench") { benchStart(st); setHandler(withRec(benchFrame, benchDebug)); }
   try { await navigator.wakeLock?.request("screen"); } catch {}
 }
 
-function toMenu() {
+async function toggleRec() {
+  if (!isRecording()) {
+    if (!startRecording({ mode, settings: { ...st } })) { say("Запись не поддерживается", { force: true }); return; }
+    document.querySelectorAll("[data-rec]").forEach(b => { b.textContent = "■ Стоп"; b.classList.add("rec-on"); });
+    say("Запись", { force: true });
+  } else {
+    document.querySelectorAll("[data-rec]").forEach(b => { b.textContent = "● Запись"; b.classList.remove("rec-on"); });
+    const hist = mode === "squat" ? squatHistory() : mode === "bench" ? benchHistory() : null;
+    const r = await stopRecording({ history: hist });
+    if (r) {
+      const mb = f => (f.size / 1e6).toFixed(1);
+      $("recInfo").textContent = r.rawFile
+        ? `видео ${mb(r.rawFile)} МБ · со скелетом ${mb(r.videoFile)} МБ · данные`
+        : `видео со скелетом ${mb(r.videoFile)} МБ · данные (сырое не записалось)`;
+      $("recDone").hidden = false;
+    }
+  }
+}
+
+async function toMenu() {
+  if (isRecording()) await toggleRec();
   setHandler(null); clear(); mode = null;
   $("stage").hidden = true; $("start").hidden = false;
 }
@@ -83,6 +105,10 @@ $("goBench").onclick = () => enter("bench");
 $("resetProfile").onclick = () => { if (confirm("Сбросить накопленные замеры пропорций и наклона?")) { resetProfile(); log("Замеры сброшены"); } };
 document.querySelectorAll("[data-back]").forEach(b => b.onclick = toMenu);
 document.querySelectorAll("[data-flip]").forEach(b => b.onclick = () => flipCamera());
+document.querySelectorAll("[data-rec]").forEach(b => b.onclick = toggleRec);
+$("recCoach").onclick = async () => { const r = await shareLast("coach"); if (r !== "ok") log(r); };
+$("recShare").onclick = async () => { const r = await shareLast("analysis"); if (r !== "ok") log(r); };
+$("recClose").onclick = () => { $("recDone").hidden = true; };
 $("sqEnd").onclick = () => squatEndSet();
 $("bpEnd").onclick = () => benchEndSet();
 liveInit();

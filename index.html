@@ -51,7 +51,8 @@
     <div class="bar">
       <button data-back>Меню</button>
       <button data-flip>Камера</button>
-      <button id="bpEnd" class="primary">Итог подхода</button>
+      <button data-rec>● Запись</button>
+      <button id="bpEnd" class="primary">Итог</button>
     </div>
   </div>
 
@@ -62,7 +63,8 @@
     <div class="bar">
       <button data-back>Меню</button>
       <button data-flip>Камера</button>
-      <button id="sqEnd" class="primary">Итог подхода</button>
+      <button data-rec>● Запись</button>
+      <button id="sqEnd" class="primary">Итог</button>
     </div>
   </div>
 </div>
@@ -101,6 +103,16 @@
   <button id="goLive">Живые углы</button>
   <button id="resetProfile" class="small">Сбросить замеры пропорций</button>
   <div id="log" class="mut small"></div>
+</div>
+
+<!-- Запись готова -->
+<div id="recDone" class="rec-done card" hidden>
+  <div><b>Запись готова</b> <span id="recInfo" class="mut small"></span></div>
+  <div class="row">
+    <button id="recCoach" class="primary">Тренеру</button>
+    <button id="recShare">Для разбора</button>
+    <button id="recClose">✕</button>
+  </div>
 </div>
 
 <script type="module" src="./src/main.js"></script>

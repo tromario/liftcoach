@@ -168,6 +168,13 @@ function bottomCue(r) {
   else if (r.forearm < -B.forearmTol) { r.faCued = true; say("Касание выше", { force: true }); }
 }
 
+export function benchDebug() {
+  if (!S || !S.ema) return null;
+  const e = S.ema, r = x => Math.round(x * 10) / 10;
+  return { state: S.state, h: r(e.h), x: r(e.x), elbow: r(e.elbow), forearm: r(e.forearm), hipY: r(e.hipY), scale: r(S.scale * 1000) / 1000, reps: S.set.length };
+}
+export function benchHistory() { return S ? { sets: [...S.sets, S.set].filter(s => s.length) } : null; }
+
 function stickingPoint(r) {
   // минимальная скорость на подъёме между 15% и 90% амплитуды (после стартового разгона)
   const rom = r.top.h - r.bottomH; if (rom < 10 || r.prof.length < 6) return null;

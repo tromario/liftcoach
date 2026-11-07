@@ -224,4 +224,10 @@ function render(lastSummary) {
   $("sqPanel").innerHTML = html;
 }
 
+export function squatDebug() {
+  if (!S || !S.ema) return null;
+  const e = S.ema, r = x => Math.round(x * 10) / 10;
+  return { state: S.state, knee: r(e.knee), hip: r(e.hipA), lean: r(e.lean), thigh: r(e.thigh), barX: r(e.barX), scale: r(S.scale * 1000) / 1000, reps: S.set.length };
+}
+
 export function squatHistory() { return S ? { sets: [...S.sets, S.set].filter(s => s.length), profile: profile.exportProfile() } : null; }
