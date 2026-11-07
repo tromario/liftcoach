@@ -1,4 +1,6 @@
 // Режим «Жим лёжа»: съёмка сбоку на уровне скамьи.
+// Основное — траектория и углы (предплечье в низу, путь грифа, вершина, таз, темп).
+// Команды судьи (Старт/Жим/Стойка) — дополнительная опция в меню.
 // Гриф ≈ запястье видимой стороны. Высота грифа считается над плечевым суставом.
 import { CFG } from "./config.js";
 import { px, drawSkeleton, video } from "./pose.js";
@@ -72,7 +74,9 @@ export function benchFrame(res, lm, ts) {
   S.scale = humCm / median(S.humBuf);
   const k = S.scale;
 
-  const raw = { h: (sh.y - wr.y) * k, x: (wr.x - sh.x) * toFeet * k, hipY: hip.y * k, elbow };
+  // Предплечье от вертикали: + запястье ближе к ногам, чем локоть (локоть «отстал» к голове), − наоборот
+  const forearm = Math.atan2((wr.x - el.x) * toFeet, el.y - wr.y) * 180 / Math.PI;
+  const raw = { h: (sh.y - wr.y) * k, x: (wr.x - sh.x) * toFeet * k, hipY: hip.y * k, elbow, forearm };
   S.ema = S.ema ? Object.fromEntries(Object.keys(raw).map(q => [q, S.ema[q] * 0.5 + raw[q] * 0.5])) : raw;
   const m = S.ema;
 
@@ -108,6 +112,7 @@ export function benchFrame(res, lm, ts) {
     if (S.state === "top" && S.top && m.h < S.top.h - B.startDropCm) {
       S.state = "down";
       S.rep = { t0: ts, bottomH: m.h, bottomX: m.x, tBottom: ts, pauseStart: 0, pauseMs: 0,
+        forearm: m.forearm, elbowBottom: m.elbow, maxFwd: 0, pathCued: false, faCued: false,
         pressSaid: 0, early: false, hipLift: 0, prof: [], top: { ...S.top } };
       status("Повтор " + (S.set.length + 1)); hint("");
     }
@@ -127,28 +132,40 @@ export function benchFrame(res, lm, ts) {
   if (S.settings.liveCues && !r.hipCued && r.hipLift > B.hipLiftCm) { r.hipCued = true; say("Таз!", { force: true }); }
 
   if (S.state === "down") {
-    if (m.h < r.bottomH) { r.bottomH = m.h; r.bottomX = m.x; r.tBottom = ts; }
+    if (m.h < r.bottomH) { r.bottomH = m.h; r.bottomX = m.x; r.tBottom = ts; r.forearm = m.forearm; r.elbowBottom = m.elbow; }
     if (still && m.h < r.top.h * 0.5) { S.state = "pause"; r.pauseStart = ts; }
-    else if (m.h > r.bottomH + B.upStartCm && r.top.h - r.bottomH > B.minRomCm) { S.state = "up"; r.pauseMs = 0; if (J) r.early = true; }
+    else if (m.h > r.bottomH + B.upStartCm && r.top.h - r.bottomH > B.minRomCm) { S.state = "up"; r.pauseMs = 0; if (J) r.early = true; bottomCue(r); }
     if (locked && r.top.h - r.bottomH < B.minRomCm) { S.state = "top"; S.rep = null; }   // дрогнул на вершине — не повтор
     return;
   }
 
   if (S.state === "pause") {
-    if (m.h < r.bottomH) { r.bottomH = m.h; r.bottomX = m.x; }
+    if (m.h < r.bottomH) { r.bottomH = m.h; r.bottomX = m.x; r.forearm = m.forearm; r.elbowBottom = m.elbow; }
     r.pauseMs = ts - r.pauseStart;
     if (J && !r.pressSaid && r.pauseMs > B.pressAfterMs) { r.pressSaid = ts; say(cmds().press, { force: true }); }
     if (m.h > r.bottomH + B.upStartCm) {
       if (J && !r.pressSaid) r.early = true;
-      S.state = "up"; r.tUp = ts;
+      S.state = "up"; r.tUp = ts; bottomCue(r);
     }
     return;
   }
 
   // up
   r.tUp ??= ts;
+  const rom = r.top.h - r.bottomH;
+  r.maxFwd = Math.max(r.maxFwd, m.x - r.bottomX);
+  if (S.settings.liveCues && !r.pathCued && m.x - r.bottomX > B.pathFwdCm && m.h - r.bottomH < rom * 0.6) {
+    r.pathCued = true; say("Назад к плечам", { force: true });
+  }
   r.prof.push({ h: (m.h + h0.h) / 2, v, t: ts });   // высота в середине окна скорости — без запаздывания
   if (locked && m.h > r.top.h - B.lockTolCm && still) finishRep(ts, m);
+}
+
+// Подсказка в нижней точке — пока ещё есть время поправить на следующем повторе
+function bottomCue(r) {
+  if (!S.settings.liveCues || r.faCued) return;
+  if (r.forearm > B.forearmTol) { r.faCued = true; say("Локти под гриф", { force: true }); }
+  else if (r.forearm < -B.forearmTol) { r.faCued = true; say("Касание выше", { force: true }); }
 }
 
 function stickingPoint(r) {
@@ -180,6 +197,10 @@ function finishRep(ts, m) {
     tDown: (r.tBottom - r.t0) / 1000,
     tUp: (ts - r.tUp) / 1000,
     rom: r.top.h - r.bottomH,
+    forearm: r.forearm,          // наклон предплечья в низу, °
+    elbowBottom: r.elbowBottom,  // угол в локте в низу, °
+    pathFwd: r.maxFwd,           // насколько гриф уходил к ногам на подъёме, см
+    lockElbow: m.elbow,
   };
   S.set.push(rep); S.state = "top"; S.rep = null; S.topStillSince = ts;
   S.lastRepEnd = ts; S.summarized = false; S.rackSaid = false;
@@ -193,12 +214,24 @@ const r1 = v => (Math.round(v * 10) / 10).toString().replace(".", ",");
 function summary() {
   const set = S.set, n = set.length;
   const parts = [`${n} ${n === 1 ? "повтор" : n < 5 ? "повтора" : "повторов"}.`];
-  const pauses = set.map(r => r.pause);
-  parts.push(`Пауза на груди ${r1(median(pauses))} секунды.`);
-  const noPause = set.filter(r => r.pause < B.minPauseS).map(r => r.n);
-  if (noPause.length) parts.push(`Без паузы ${list(noPause)}.`);
-  const early = set.filter(r => r.early).map(r => r.n);
-  if (early.length) parts.push(`Ранний жим ${list(early)}.`);
+  const ok0 = parts.length;
+  const faOut = set.filter(r => r.forearm > B.forearmTol).map(r => r.n);
+  const faIn = set.filter(r => r.forearm < -B.forearmTol).map(r => r.n);
+  if (faOut.length) parts.push(`Локти отставали от грифа ${list(faOut)}, предплечье около ${Math.round(median(set.filter(r => r.forearm > B.forearmTol).map(r => r.forearm)))} градусов от вертикали. Подводи локти под гриф.`);
+  if (faIn.length) parts.push(`Локти уходили вперёд грифа ${list(faIn)}. Касайся чуть выше.`);
+  const fwd = set.filter(r => r.pathFwd > B.pathFwdCm).map(r => r.n);
+  if (fwd.length) parts.push(`На подъёме гриф уходил к ногам ${list(fwd)}. Жми назад, к плечам.`);
+  const fast = set.filter(r => r.tDown < B.descentMinS).map(r => r.n);
+  if (fast.length) parts.push(`Слишком быстро опускаешь ${list(fast)}.`);
+  const soft = set.filter(r => r.lockElbow < B.fullLockElbow).map(r => r.n);
+  if (soft.length) parts.push(`Не дожимаешь до прямых рук ${list(soft)}.`);
+  if (S.settings.judge !== "off") {
+    parts.push(`Пауза на груди ${r1(median(set.map(r => r.pause)))} секунды.`);
+    const noPause = set.filter(r => r.pause < B.minPauseS).map(r => r.n);
+    if (noPause.length) parts.push(`Без паузы ${list(noPause)}.`);
+    const early = set.filter(r => r.early).map(r => r.n);
+    if (early.length) parts.push(`Ранний жим ${list(early)}.`);
+  }
   const hip = set.filter(r => r.hipLift > B.hipLiftCm).map(r => r.n);
   if (hip.length) parts.push(`Таз отрывался ${list(hip)}.`);
   const lockFwd = set.filter(r => r.lockX > B.lockForwardCm).map(r => r.n);
@@ -207,6 +240,7 @@ function summary() {
   if (sps.length >= Math.max(1, n / 2)) parts.push(`Мёртвая точка около ${Math.round(median(sps))} сантиметров от груди.`);
   const touches = set.map(r => r.touch);
   if (Math.max(...touches) - Math.min(...touches) > B.touchSpreadCm) parts.push("Касание груди в разных местах.");
+  if (parts.length === ok0 || (parts.length === ok0 + 1 && sps.length)) parts.splice(ok0, 0, "Траектория и углы ровные.");
 
   say(parts.join(" "), { force: true });
   S.sets.push(set); S.set = []; S.summarized = true; S.rackSaid = true;
@@ -221,13 +255,16 @@ function render(lastSummary) {
   const p = profile.proportions();
   let html = `<div class="mut small">Масштаб: ${p ? "плечо " + f0(p.upperArm) + " см из калибровки" : "по росту (сделай присед — будет точнее)"}</div>`;
   if (set.length) {
-    html += `<table><tr><th>#</th><th>Пауза</th><th>Касание</th><th>Вершина</th><th>МТ</th><th></th></tr>`;
+    const J = S.settings.judge !== "off";
+    html += `<table><tr><th>#</th><th>Предпл.</th><th>Локоть</th><th>Касание</th><th>Вершина</th><th>МТ</th>${J ? "<th>Пауза</th>" : ""}<th></th></tr>`;
     for (const r of set) {
-      const flags = [r.early ? "ранний" : "", r.hipLift > B.hipLiftCm ? "таз" : ""].filter(Boolean).join(", ");
-      html += `<tr><td>${r.n}</td><td>${r1(r.pause)} с</td><td>${sg(r.touch)}</td><td>${sg(r.lockX)}</td>`
-        + `<td>${r.sticking != null ? f0(r.sticking) : "–"}</td><td class="small">${flags}</td></tr>`;
+      const faCls = Math.abs(r.forearm) > B.forearmTol ? ' class="down"' : "";
+      const flags = [r.pathFwd > B.pathFwdCm ? "к ногам" : "", r.hipLift > B.hipLiftCm ? "таз" : "", J && r.early ? "ранний" : ""].filter(Boolean).join(", ");
+      html += `<tr><td>${r.n}</td><td${faCls}>${sg(r.forearm)}°</td><td>${f0(r.elbowBottom)}°</td><td>${sg(r.touch)}</td><td>${sg(r.lockX)}</td>`
+        + `<td>${r.sticking != null ? f0(r.sticking) : "–"}</td>${J ? `<td>${r1(r.pause)} с</td>` : ""}<td class="small">${flags}</td></tr>`;
     }
-    html += `</table><div class="mut small">Касание и вершина — см от плечевого сустава к ногам. МТ — мёртвая точка, см от груди.</div>`;
+    html += `</table><div class="mut small">Предплечье в низу: 0° — вертикально (оптимум), ± до ${B.forearmTol}° — норма; «+» локоть отстаёт к голове. `
+      + `Касание и вершина — см от плечевого сустава к ногам; вершина около 0 — гриф над плечами. МТ — мёртвая точка, см от груди.</div>`;
   }
   if (lastSummary) html += `<div class="small" style="margin-top:6px">${lastSummary}</div>`;
   $("bpPanel").innerHTML = html;
