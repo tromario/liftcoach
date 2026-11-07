@@ -9,6 +9,7 @@ import { squatStart, squatFrame, squatEndSet, squatDebug, squatHistory } from ".
 import { benchStart, benchFrame, benchEndSet, benchDebug, benchHistory } from "./bench.js";
 import { startRecording, stopRecording, recordFrame, isRecording, shareLast, recordingStatus } from "./recorder.js";
 import { resetProfile } from "./profile.js";
+import { setupStart, setupFrame, setupStop } from "./setup.js";
 
 const $ = id => document.getElementById(id);
 const log = t => $("log").textContent = t;
@@ -67,10 +68,8 @@ async function enter(m) {
   $("live").hidden = m !== "live"; $("squat").hidden = m !== "squat"; $("bench").hidden = m !== "bench";
   $("statusChip").hidden = m === "live";
   clear();
-  const withRec = (fn, dbg) => (res, lm, ts) => { fn(res, lm, ts); if (isRecording()) recordFrame(lm, ts, dbg?.()); };
   if (m === "live") setHandler(withRec(liveFrame));
-  if (m === "squat") { squatStart(st); setHandler(withRec(squatFrame, squatDebug)); }
-  if (m === "bench") { benchStart(st); setHandler(withRec(benchFrame, benchDebug)); }
+  else runSetup();
   try { await navigator.wakeLock?.request("screen"); } catch {}
 }
 
@@ -78,6 +77,22 @@ function updateRecButton() {
   const r = recordingStatus(); if (!r) return;
   const m = Math.floor(r.sec / 60), sec = String(Math.floor(r.sec % 60)).padStart(2, "0");
   document.querySelectorAll("[data-rec]").forEach(b => { b.textContent = `■ ${m}:${sec} · ${Math.round(r.mb)} МБ`; });
+}
+
+const withRec = (fn, dbg) => (res, lm, ts) => { fn(res, lm, ts); if (isRecording()) recordFrame(lm, ts, dbg?.()); };
+
+function startMode() {
+  setupStop(); clear();
+  $("squat").hidden = mode !== "squat"; $("bench").hidden = mode !== "bench";
+  if (mode === "squat") { squatStart(st); setHandler(withRec(squatFrame, squatDebug)); }
+  if (mode === "bench") { benchStart(st); setHandler(withRec(benchFrame, benchDebug)); }
+}
+
+/** Сначала выставляем камеру, потом — режим. Запись (если идёт) продолжается. */
+function runSetup() {
+  $("squat").hidden = true; $("bench").hidden = true; clear();
+  setupStart(mode, startMode);
+  setHandler(withRec(setupFrame, () => ({ state: "setup" })));
 }
 
 async function toggleRec() {
@@ -98,6 +113,7 @@ async function toggleRec() {
 
 async function toMenu() {
   if (isRecording()) await toggleRec();
+  setupStop();
   setHandler(null); clear(); mode = null;
   $("stage").hidden = true; $("start").hidden = false;
 }
@@ -109,6 +125,8 @@ $("resetProfile").onclick = () => { if (confirm("Сбросить накопле
 document.querySelectorAll("[data-back]").forEach(b => b.onclick = toMenu);
 document.querySelectorAll("[data-flip]").forEach(b => b.onclick = () => flipCamera());
 document.querySelectorAll("[data-rec]").forEach(b => b.onclick = toggleRec);
+document.querySelectorAll("[data-setup]").forEach(b => b.onclick = runSetup);
+$("suSkip").onclick = startMode;
 $("recCoach").onclick = async () => { const r = await shareLast("coach"); if (r !== "ok") log(r); };
 $("recShare").onclick = async () => { const r = await shareLast("analysis"); if (r !== "ok") log(r); };
 $("recClose").onclick = () => { $("recDone").hidden = true; };

@@ -50,6 +50,18 @@ th{color:var(--mut);font-weight:500;font-size:13px}
 .photos{display:flex;gap:8px;margin:4px 0 12px}
 .photos img{flex:1;min-width:0;border-radius:10px;background:#111}
 
+/* Ракурс */
+.setup{position:absolute;inset:0;z-index:3;pointer-events:none}
+.setup .bar,.setup .card{pointer-events:auto}
+.su-card{position:absolute;left:12px;right:12px;top:calc(env(safe-area-inset-top) + 52px)}
+.su-list{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px;font-size:14px}
+.su-list li{display:flex;align-items:center;gap:8px}
+.su-list .dot{width:12px;height:12px;border-radius:50%;background:#555;flex:none}
+.su-list li.ok .dot{background:var(--ok)} .su-list li.bad .dot{background:var(--warn)}
+.su-list li.ok{color:#cfe}
+.su-hint{position:absolute;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 80px);text-align:center;font-size:22px;font-weight:700;text-shadow:0 2px 8px #000}
+.su-hint.ok{color:var(--ok)} .su-hint.bad{color:var(--warn)}
+
 /* Запись */
 button.rec-on{background:#c62828}
 .rec-done{position:fixed;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 76px);z-index:6}

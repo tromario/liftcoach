@@ -44,13 +44,27 @@
     </div>
   </div>
 
+  <!-- Настройка ракурса -->
+  <div id="setup" class="setup" hidden>
+    <div class="card su-card">
+      <div class="wz-title" id="suTitle">Ракурс</div>
+      <div class="wz-instr" id="suInstr"></div>
+      <ul id="suList" class="su-list"></ul>
+    </div>
+    <div id="suHint" class="su-hint"></div>
+    <div class="bar">
+      <button data-back>Меню</button>
+      <button id="suSkip">Пропустить</button>
+    </div>
+  </div>
+
   <!-- Режим «Жим» -->
   <div id="bench" hidden>
     <div id="bpPanel" class="card sq-panel"></div>
     <div id="bpHint" class="wz-hint">–</div>
     <div class="bar">
       <button data-back>Меню</button>
-      <button data-flip>Камера</button>
+      <button data-setup>Ракурс</button>
       <button data-rec>● Запись</button>
       <button id="bpEnd" class="primary">Итог</button>
     </div>
@@ -62,7 +76,7 @@
     <div id="sqHint" class="wz-hint">–</div>
     <div class="bar">
       <button data-back>Меню</button>
-      <button data-flip>Камера</button>
+      <button data-setup>Ракурс</button>
       <button data-rec>● Запись</button>
       <button id="sqEnd" class="primary">Итог</button>
     </div>
