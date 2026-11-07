@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="LiftCoach">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
+<title>LiftCoach</title>
+</head>
+<body>
+
+<!-- Камера и скелет: общий слой для всех режимов -->
+<div id="stage" hidden>
+  <video id="video" playsinline muted autoplay></video>
+  <canvas id="canvas"></canvas>
+
+  <div class="hud">
+    <div class="chip">FPS <b id="fps">–</b></div>
+    <div class="chip" id="levelChip">Уровень <b id="levelVal">–</b></div>
+    <div class="chip" id="statusChip" hidden><b id="modeStatus">–</b></div>
+    <div class="chip" id="modelChip">–</div>
+  </div>
+
+  <!-- Режим «Живые углы» -->
+  <div id="live" hidden>
+    <div id="angles" class="card">
+      <div><span>Сторона</span><span id="side">–</span></div>
+      <div><span>Скелет</span><span id="vis">–</span></div>
+      <div><span>Колено</span><span id="aKnee">–</span></div>
+      <div><span>Таз</span><span id="aHip">–</span></div>
+      <div><span>Наклон корпуса</span><span id="aTorso">–</span></div>
+      <div><span>Локоть</span><span id="aElbow">–</span></div>
+      <div><span>Мин. колено</span><span id="aMin">–</span></div>
+    </div>
+    <div class="bar">
+      <button data-back>Меню</button>
+      <button data-flip>Камера</button>
+      <button id="speak">Озвучить</button>
+      <button id="reset">Сброс мин.</button>
+    </div>
+  </div>
+
+  <!-- Режим «Жим» -->
+  <div id="bench" hidden>
+    <div id="bpPanel" class="card sq-panel"></div>
+    <div id="bpHint" class="wz-hint">–</div>
+    <div class="bar">
+      <button data-back>Меню</button>
+      <button data-flip>Камера</button>
+      <button id="bpEnd" class="primary">Итог подхода</button>
+    </div>
+  </div>
+
+  <!-- Режим «Присед» -->
+  <div id="squat" hidden>
+    <div id="sqPanel" class="card sq-panel"></div>
+    <div id="sqHint" class="wz-hint">–</div>
+    <div class="bar">
+      <button data-back>Меню</button>
+      <button data-flip>Камера</button>
+      <button id="sqEnd" class="primary">Итог подхода</button>
+    </div>
+  </div>
+</div>
+
+<!-- Стартовый экран -->
+<div id="start" class="screen">
+  <h1>LiftCoach</h1>
+  <p class="mut">Тренер по технике: присед, жим, тяга</p>
+  <label class="field">Рост, см
+    <input id="height" type="number" inputmode="decimal" min="140" max="220" step="0.5">
+  </label>
+  <label class="field">Модель позы
+    <select id="model">
+      <option value="lite">lite — быстрее</option>
+      <option value="full">full — точнее</option>
+      <option value="heavy">heavy — самая точная, медленно</option>
+    </select>
+  </label>
+  <label class="field">Подсказки во время повтора
+    <select id="liveCues">
+      <option value="1">Да: сигналы, «Грудь!», «Таз!»</option>
+      <option value="0">Нет, только итог подхода</option>
+    </select>
+  </label>
+  <label class="field">Команды судьи
+    <select id="judge">
+      <option value="off">Выключены</option>
+      <option value="ru">По-русски: Присед, Старт, Жим, Стойка</option>
+      <option value="en">По-английски: Squat, Start, Press, Rack</option>
+    </select>
+  </label>
+  <div class="row" style="width:280px">
+    <button class="primary" id="goSquat">Присед</button>
+    <button class="primary" id="goBench">Жим</button>
+  </div>
+  <button id="goLive">Живые углы</button>
+  <button id="resetProfile" class="small">Сбросить замеры пропорций</button>
+  <div id="log" class="mut small"></div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
