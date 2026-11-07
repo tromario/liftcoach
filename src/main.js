@@ -7,7 +7,7 @@ import { loadSettings, saveSettings } from "./config.js";
 import { liveFrame, liveInit } from "./live.js";
 import { squatStart, squatFrame, squatEndSet, squatDebug, squatHistory } from "./squat.js";
 import { benchStart, benchFrame, benchEndSet, benchDebug, benchHistory } from "./bench.js";
-import { startRecording, stopRecording, recordFrame, isRecording, shareLast } from "./recorder.js";
+import { startRecording, stopRecording, recordFrame, isRecording, shareLast, recordingStatus } from "./recorder.js";
 import { resetProfile } from "./profile.js";
 
 const $ = id => document.getElementById(id);
@@ -41,7 +41,7 @@ async function boot() {
   $("modelChip").textContent = st.model + " · " + delegate;
   log("Включаю камеру…");
   await startCamera();
-  startLoop(fps => { $("fps").textContent = fps; updateLevel(); });
+  startLoop(fps => { $("fps").textContent = fps; updateLevel(); updateRecButton(); });
   booted = true;
   log("");
 }
@@ -74,6 +74,12 @@ async function enter(m) {
   try { await navigator.wakeLock?.request("screen"); } catch {}
 }
 
+function updateRecButton() {
+  const r = recordingStatus(); if (!r) return;
+  const m = Math.floor(r.sec / 60), sec = String(Math.floor(r.sec % 60)).padStart(2, "0");
+  document.querySelectorAll("[data-rec]").forEach(b => { b.textContent = `■ ${m}:${sec} · ${Math.round(r.mb)} МБ`; });
+}
+
 async function toggleRec() {
   if (!isRecording()) {
     if (!startRecording({ mode, settings: { ...st } })) { say("Запись не поддерживается", { force: true }); return; }
@@ -84,10 +90,7 @@ async function toggleRec() {
     const hist = mode === "squat" ? squatHistory() : mode === "bench" ? benchHistory() : null;
     const r = await stopRecording({ history: hist });
     if (r) {
-      const mb = f => (f.size / 1e6).toFixed(1);
-      $("recInfo").textContent = r.rawFile
-        ? `видео ${mb(r.rawFile)} МБ · со скелетом ${mb(r.videoFile)} МБ · данные`
-        : `видео со скелетом ${mb(r.videoFile)} МБ · данные (сырое не записалось)`;
+      $("recInfo").textContent = `видео ${(r.videoFile.size / 1e6).toFixed(0)} МБ · данные ${(r.dataFile.size / 1e6).toFixed(1)} МБ`;
       $("recDone").hidden = false;
     }
   }
