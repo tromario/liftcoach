@@ -24,6 +24,7 @@ $("judge").value = st.judge;
 $("autoRec").value = st.autoRec ? "1" : "0";
 $("quality").value = st.quality;
 $("audio").value = st.audio ? "1" : "0";
+$("skeletonVideo").value = st.skeletonVideo ? "1" : "0";
 function readSettings() {
   const h = parseFloat($("height").value);
   Object.assign(st, {
@@ -34,6 +35,7 @@ function readSettings() {
     autoRec: $("autoRec").value === "1",
     quality: $("quality").value,
     audio: $("audio").value === "1",
+    skeletonVideo: $("skeletonVideo").value === "1",
   });
   saveSettings(st);
   return st;
@@ -106,7 +108,7 @@ function runSetup() {
 
 async function toggleRec() {
   if (!isRecording()) {
-    if (!(await startRecording({ mode, settings: { ...st } }, { audio: st.audio }))) { say("Запись не поддерживается", { force: true }); return; }
+    if (!(await startRecording({ mode, settings: { ...st } }, { audio: st.audio, skeleton: st.skeletonVideo }))) { say("Запись не поддерживается", { force: true }); return; }
     document.querySelectorAll("[data-rec]").forEach(b => { b.textContent = "■ Стоп"; b.classList.add("rec-on"); });
     say("Запись", { force: true });
   } else {
@@ -114,7 +116,7 @@ async function toggleRec() {
     const hist = mode === "squat" ? squatHistory() : mode === "bench" ? benchHistory() : null;
     const r = await stopRecording({ history: hist });
     if (r) {
-      $("recInfo").textContent = `видео ${(r.videoFile.size / 1e6).toFixed(0)} МБ${r.audio ? " со звуком" : r.audioWanted ? " без звука (нет доступа к микрофону)" : ""} · данные ${(r.dataFile.size / 1e6).toFixed(1)} МБ`;
+      $("recInfo").textContent = `видео${r.skeleton ? " со скелетом" : ""} ${(r.videoFile.size / 1e6).toFixed(0)} МБ${r.audio ? " со звуком" : r.audioWanted ? " без звука (нет доступа к микрофону)" : ""} · данные ${(r.dataFile.size / 1e6).toFixed(1)} МБ`;
       $("recDone").hidden = false;
     }
   }

@@ -2,7 +2,7 @@
 // Видео — тренеру и для разбора; данные — для разбора (скелет по ним восстанавливается).
 // Ограничения по длительности нет. Всё копится в памяти телефона.
 // 720p — 5 Мбит/с (~37 МБ/мин), 1080p — 10 Мбит/с (~75 МБ/мин). Звук — по настройке.
-import { video, facing, quality } from "./pose.js";
+import { video, facing, quality, drawSkeleton } from "./pose.js";
 
 const BITRATE = { "720": 5_000_000, "1080": 10_000_000 };
 let rec = null;
@@ -26,13 +26,22 @@ async function getMic() {
 }
 
 let starting = false;
-export async function startRecording(meta, { audio = false } = {}) {
+export async function startRecording(meta, { audio = false, skeleton = false } = {}) {
   if (rec || starting || !window.MediaRecorder || !video.srcObject) return false;
   starting = true;
   const mime = pickMime();
   const mic = audio ? await getMic() : null;
   starting = false;
-  const tracks = [...video.srcObject.getVideoTracks(), ...(mic ? [mic] : [])];
+  // Скелет на видео: пишем не камеру, а холст, на котором рисуем кадр + скелет
+  let c = null, g = null, videoTracks = video.srcObject.getVideoTracks();
+  if (skeleton) {
+    const vw = video.videoWidth, vh = video.videoHeight, k = Math.min(1, (quality === "1080" ? 1920 : 1280) / Math.max(vw, vh));
+    c = document.createElement("canvas"); c.width = Math.round(vw * k); c.height = Math.round(vh * k);
+    g = c.getContext("2d");
+    g.drawImage(video, 0, 0, c.width, c.height);
+    videoTracks = c.captureStream(30).getVideoTracks();
+  }
+  const tracks = [...videoTracks, ...(mic ? [mic] : [])];
   const src = new MediaStream(tracks);
   const opts = { videoBitsPerSecond: BITRATE[quality] || BITRATE["720"], ...(mic ? { audioBitsPerSecond: 128_000 } : {}) };
   if (mime) opts.mimeType = mime;
@@ -40,7 +49,7 @@ export async function startRecording(meta, { audio = false } = {}) {
   const chunks = [];
   let bytes = 0;
   mr.ondataavailable = e => { if (e.data.size) { chunks.push(e.data); bytes += e.data.size; if (rec) rec.bytes = bytes; } };
-  rec = { mr, chunks, bytes: 0, mime: mr.mimeType || mime, t0: performance.now(), frames: [], meta, mic, audioWanted: audio };
+  rec = { mr, chunks, bytes: 0, mime: mr.mimeType || mime, t0: performance.now(), frames: [], meta, mic, audioWanted: audio, c, g };
   rec.stopped = new Promise(res => { mr.onstop = res; });
   mr.start(1000);
   return true;
@@ -57,6 +66,21 @@ const r4 = v => Math.round(v * 10000) / 10000;
 /** Вызывается на каждый кадр: сохраняет точки скелета и состояние режима */
 export function recordFrame(lm, ts, state) {
   if (!rec) return;
+  if (rec.c) {
+    const { c, g } = rec;
+    g.save();
+    if (facing === "user") { g.translate(c.width, 0); g.scale(-1, 1); }
+    g.drawImage(video, 0, 0, c.width, c.height);
+    if (lm) drawSkeleton(lm, { target: g, w: c.width, h: c.height, highlight: [...Array(33).keys()] });
+    g.restore();
+    // время от начала записи и фаза — по ним видео сверяется с данными
+    const label = `${((ts - rec.t0) / 1000).toFixed(1)} с${state?.state ? " · " + state.state : ""}`;
+    const fs = Math.round(c.height / 32);
+    g.font = `600 ${fs}px -apple-system,sans-serif`;
+    const tw = g.measureText(label).width;
+    g.fillStyle = "rgba(0,0,0,.55)"; g.fillRect(fs * .5, fs * .5, tw + fs, fs * 1.6);
+    g.fillStyle = "#fff"; g.fillText(label, fs, fs * 1.6);
+  }
   rec.frames.push({
     t: Math.round(ts - rec.t0) / 1000,
     lm: lm ? lm.map(p => [r4(p.x), r4(p.y), r4(p.z), Math.round((p.visibility ?? 0) * 100) / 100]) : null,
@@ -76,13 +100,13 @@ export async function stopRecording(extra = {}) {
   const videoFile = new File(r.chunks, `${base}.${ext}`, { type: r.mime || "video/mp4" });
   const data = {
     app: "liftcoach", version: 2, ...r.meta, recordedAt: new Date().toISOString(),
-    video: { file: videoFile.name, width: video.videoWidth, height: video.videoHeight, facing, quality, audio: !!r.mic },
+    video: { file: videoFile.name, width: r.c ? r.c.width : video.videoWidth, height: r.c ? r.c.height : video.videoHeight, facing, quality, audio: !!r.mic, skeleton: !!r.c },
     note: "t — секунды от начала видео; lm — 33 точки MediaPipe [x, y, z, visibility] в долях кадра",
     ...extra,
     frames: r.frames,
   };
   const dataFile = new File([JSON.stringify(data)], `${base}.json`, { type: "application/json" });
-  last = { videoFile, dataFile, audio: !!r.mic, audioWanted: r.audioWanted };
+  last = { videoFile, dataFile, audio: !!r.mic, audioWanted: r.audioWanted, skeleton: !!r.c };
   return last;
 }
 
