@@ -3,7 +3,7 @@
 //  2) «На месте» — ты в позиции подхода; проверяем ракурс и говорим поправки в сантиметрах.
 // Ушёл из кадра — снова этап 1 (видимо, пошёл к штативу). Вернулся — снова проверка.
 // Высоту камеры оцениваем через горизонт: при ровном телефоне центр кадра = высота объектива.
-import { px, drawSkeleton, video } from "./pose.js";
+import { px, drawSkeleton, video, lockTarget } from "./pose.js";
 import { nearSide, sideIdx, dist, angle } from "./geom.js";
 import { level } from "./level.js";
 import { say } from "./voice.js";
@@ -183,7 +183,11 @@ function showPhase() {
 function personPresent(lm) {
   if (!lm) return false;
   const s = sideIdx(nearSide(lm).side);
-  return [s.sh, s.hip].every(i => (lm[i].visibility ?? 0) > 0.6);
+  if (![s.sh, s.hip].every(i => (lm[i].visibility ?? 0) > 0.6)) return false;
+  // человек на заднем плане мельче — его не считаем «на месте»
+  if (S.mode === "bench") return dist(px(lm, s.sh), px(lm, s.hip)) / video.videoWidth > 0.12;
+  const eyeY = Math.min(lm[2].y, lm[5].y), floorY = Math.max(lm[s.heel].y, lm[s.toe].y);
+  return floorY - eyeY > 0.35;
 }
 
 export function setupFrame(res, lm, ts) {
@@ -219,6 +223,7 @@ export function setupFrame(res, lm, ts) {
     S.okSince ||= ts;
     if (ts - S.okSince > 1500) {
       S.done = true; S.fixes = [];
+      lockTarget();   // запомнили, кто ты — дальше остальных в кадре игнорируем
       say("Камера выставлена", { force: true });
       setTimeout(() => { const cb = S?.onDone; setupStop(); cb?.(); }, 600);
     }

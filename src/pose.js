@@ -25,7 +25,7 @@ export async function initPose(model) {
   const fileset = await FilesetResolver.forVisionTasks(BASE + "mediapipe/wasm");
   const opts = delegate => ({
     baseOptions: { modelAssetPath: MODELS[model], delegate },
-    runningMode: "VIDEO", numPoses: 1,
+    runningMode: "VIDEO", numPoses: 3,      // ищем до 3 людей, дальше выбираем «своего»
     minPoseDetectionConfidence: .5, minPosePresenceConfidence: .5, minTrackingConfidence: .5,
   });
   let delegate = "GPU";
@@ -52,6 +52,57 @@ export async function startCamera(f = facing, q = quality) {
 
 export const flipCamera = () => startCamera(facing === "environment" ? "user" : "environment");
 
+// ---------- Отслеживание «своего» человека ----------
+// До фиксации берём самого крупного в кадре. После фиксации (конец настройки ракурса) —
+// того, кто ближе к прошлому положению и похож по размеру. Остальных игнорируем.
+let target = null, locked = false;
+const TRACK_IDX = [0, 11, 12, 23, 24, 25, 26, 27, 28];   // без рук — их положение сильно меняется
+
+function bodyBox(lm) {
+  const pts = TRACK_IDX.map(i => lm[i]).filter(p => (p.visibility ?? 0) > 0.4);
+  if (pts.length < 4) return null;
+  const W = video.videoWidth, H = video.videoHeight;
+  const xs = pts.map(p => p.x * W), ys = pts.map(p => p.y * H);
+  const core = [11, 12, 23, 24].map(i => lm[i]);
+  return {
+    x: core.reduce((s, p) => s + p.x, 0) / 4 * W,
+    y: core.reduce((s, p) => s + p.y, 0) / 4 * H,
+    size: Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) || 1,
+    vis: pts.reduce((s, p) => s + (p.visibility ?? 0), 0) / pts.length,
+  };
+}
+
+function pickPerson(list, ts) {
+  const boxes = list.map(bodyBox);
+  let best = -1;
+  if (!locked || !target) {
+    let bs = 0;
+    boxes.forEach((b, i) => { if (b && b.size * b.vis > bs) { bs = b.size * b.vis; best = i; } });
+  } else {
+    const radius = target.size * (ts - target.t < 500 ? 0.6 : 1.0);   // потеряли — ищем шире
+    let bd = Infinity;
+    boxes.forEach((b, i) => {
+      if (!b) return;
+      const ratio = Math.max(b.size / target.size, target.size / b.size);
+      const d = Math.hypot(b.x - target.x, b.y - target.y);
+      if (ratio < 1.8 && d < radius && d < bd) { bd = d; best = i; }
+    });
+  }
+  if (best >= 0) {
+    const b = boxes[best];
+    target = target && locked
+      ? { x: target.x * 0.5 + b.x * 0.5, y: target.y * 0.5 + b.y * 0.5, size: target.size * 0.8 + b.size * 0.2, t: ts }
+      : { ...b, t: ts };
+  }
+  return best;
+}
+
+/** Зафиксировать текущего человека как «своего» */
+export function lockTarget() { if (target) locked = true; return locked; }
+/** Снять фиксацию — снова берём самого крупного */
+export function unlockTarget() { locked = false; target = null; }
+export const isLocked = () => locked;
+
 /** handler(result, lm|null, ts) вызывается на каждый кадр */
 export function setHandler(fn) { handler = fn; }
 
@@ -66,9 +117,13 @@ export function startLoop(onFps) {
     const res = landmarker.detectForVideo(video, ts);
     frames++;
     if (ts - fpsT > 1000) { onFps?.(Math.round(frames * 1000 / (ts - fpsT))); frames = 0; fpsT = ts; }
-    const lm = res.landmarks?.[0] || null;
+    const all = res.landmarks || [];
+    const idx = all.length ? pickPerson(all, ts) : -1;
+    const lm = idx >= 0 ? all[idx] : null;
     if (!lm) clear();
     handler?.(res, lm, ts);
+    // остальные люди — тонким серым, чтобы было видно, что их игнорируем
+    all.forEach((o, i) => { if (i !== idx) drawOther(o); });
   };
   requestAnimationFrame(tick);
 }
@@ -95,6 +150,15 @@ export function drawSkeleton(lm, { highlight = [], color = "#ff5a36", target = c
     const p = P(i); if (p.v < .3) continue;
     target.fillStyle = p.v > .7 ? "#3ddc84" : "#ffcc00";
     target.beginPath(); target.arc(p.x, p.y, Math.max(4, w / 180), 0, 7); target.fill();
+  }
+}
+
+function drawOther(lm) {
+  const w = canvas.width, h = canvas.height;
+  ctx.lineWidth = Math.max(1.5, w / 600); ctx.strokeStyle = "rgba(160,160,160,.45)"; ctx.lineCap = "round";
+  for (const [a, b] of BONES) {
+    if ((lm[a].visibility ?? 0) < .3 || (lm[b].visibility ?? 0) < .3) continue;
+    ctx.beginPath(); ctx.moveTo(lm[a].x * w, lm[a].y * h); ctx.lineTo(lm[b].x * w, lm[b].y * h); ctx.stroke();
   }
 }
 

@@ -1,5 +1,5 @@
 import "./style.css";
-import { initPose, startCamera, startLoop, setHandler, flipCamera, clear } from "./pose.js";
+import { initPose, startCamera, startLoop, setHandler, flipCamera, clear, lockTarget, unlockTarget } from "./pose.js";
 import * as pose from "./pose.js";
 import { unlockVoice, say } from "./voice.js";
 import { unlockAudio } from "./audio.js";
@@ -98,6 +98,7 @@ function startMode() {
 
 /** Сначала выставляем камеру, потом — режим. Запись (если идёт) продолжается. */
 function runSetup() {
+  unlockTarget();
   $("squat").hidden = true; $("bench").hidden = true; clear();
   setupStart(mode, () => { startMode(); if (st.autoRec && !isRecording()) toggleRec(); }, st);
   setHandler(withRec(setupFrame, () => ({ state: "setup" })));
@@ -121,7 +122,7 @@ async function toggleRec() {
 
 async function toMenu() {
   if (isRecording()) await toggleRec();
-  setupStop();
+  setupStop(); unlockTarget();
   setHandler(null); clear(); mode = null;
   $("stage").hidden = true; $("start").hidden = false;
 }
@@ -134,7 +135,7 @@ document.querySelectorAll("[data-back]").forEach(b => b.onclick = toMenu);
 document.querySelectorAll("[data-flip]").forEach(b => b.onclick = () => flipCamera());
 document.querySelectorAll("[data-rec]").forEach(b => b.onclick = toggleRec);
 document.querySelectorAll("[data-setup]").forEach(b => b.onclick = runSetup);
-$("suSkip").onclick = startMode;
+$("suSkip").onclick = () => { lockTarget(); startMode(); };   // пропустили настройку — «свой» тот, кто сейчас в кадре крупнее всех
 $("recCoach").onclick = async () => { const r = await shareLast("coach"); if (r !== "ok") log(r); };
 $("recShare").onclick = async () => { const r = await shareLast("analysis"); if (r !== "ok") log(r); };
 $("recClose").onclick = () => { $("recDone").hidden = true; };
