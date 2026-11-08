@@ -44,28 +44,29 @@
     </div>
   </div>
 
-  <!-- Настройка ракурса -->
+  <!-- Настройка ракурса (у телефона) -->
   <div id="setup" class="setup" hidden>
-    <div class="card su-card">
-      <div class="wz-step" id="suPhase"></div>
-      <div class="wz-title" id="suTitle">Ракурс</div>
-      <div class="wz-instr" id="suInstr"></div>
+    <div class="card su-card" id="suCard">
+      <div class="wz-title"><span id="suTitle">Ракурс</span> <span class="su-more mut small">советы ▾</span></div>
+      <ul id="suInstr" class="su-tips"></ul>
       <ul id="suList" class="su-list"></ul>
-      <div id="suFixBox" class="su-fix" hidden>
-        <div class="su-fix-title">Поправь штатив:</div>
-        <ul id="suFix"></ul>
+      <div class="su-lens">
+        <span class="mut small">Объектив</span>
+        <button data-lens="wide">1×</button>
+        <button data-lens="ultra">0.5×</button>
+        <span id="suLensNote" class="mut small"></span>
       </div>
     </div>
     <div id="suHint" class="su-hint"></div>
     <div class="bar">
       <button data-back>Меню</button>
-      <button id="suSkip">Пропустить</button>
+      <button id="suDone" class="primary">Готово</button>
     </div>
   </div>
 
   <!-- Режим «Жим» -->
   <div id="bench" hidden>
-    <div id="bpPanel" class="card sq-panel"></div>
+    <div id="bpPanel" class="card sq-panel" data-collapse></div>
     <div id="bpHint" class="wz-hint">–</div>
     <div class="bar">
       <button data-back>Меню</button>
@@ -77,7 +78,7 @@
 
   <!-- Режим «Присед» -->
   <div id="squat" hidden>
-    <div id="sqPanel" class="card sq-panel"></div>
+    <div id="sqPanel" class="card sq-panel" data-collapse></div>
     <div id="sqHint" class="wz-hint">–</div>
     <div class="bar">
       <button data-back>Меню</button>
@@ -103,12 +104,19 @@
     <a class="btn" href="./anim/deadlift.html">Тяга</a>
   </div>
   <button id="goLive">Живые углы</button>
-  <h3 class="settings-title">Настройки</h3>
+  <button id="goSettings">Настройки</button>
+  <div id="log" class="mut small"></div>
+</div>
+
+<!-- Настройки -->
+<div id="settings" class="screen" hidden>
+  <h2>Настройки</h2>
   <label class="field">Рост, см
     <input id="height" type="number" inputmode="decimal" min="140" max="220" step="0.5">
   </label>
   <label class="field">Модель позы
     <select id="model">
+      <option value="auto">авто — full, при FPS ниже 15 переключится на lite</option>
       <option value="lite">lite — быстрее</option>
       <option value="full">full — точнее</option>
       <option value="heavy">heavy — самая точная, медленно</option>
@@ -120,10 +128,10 @@
       <option value="0">Нет, только итог подхода</option>
     </select>
   </label>
-  <label class="field">Запись после настройки ракурса
+  <label class="field">Запись
     <select id="autoRec">
-      <option value="1">Включать автоматически</option>
-      <option value="0">Только кнопкой</option>
+      <option value="0">Только кнопкой «● Запись»</option>
+      <option value="1">Автоматически после «Готово» в ракурсе</option>
     </select>
   </label>
   <label class="field">Качество записи
@@ -152,7 +160,7 @@
     </select>
   </label>
   <button id="resetProfile" class="small">Сбросить замеры пропорций</button>
-  <div id="log" class="mut small"></div>
+  <button id="settingsBack" class="primary">Готово</button>
 </div>
 
 <!-- Запись готова -->

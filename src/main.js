@@ -1,7 +1,7 @@
 import "./style.css";
-import { initPose, startCamera, startLoop, setHandler, flipCamera, clear, lockTarget, unlockTarget } from "./pose.js";
+import { initPose, startCamera, startLoop, setHandler, flipCamera, clear, unlockTarget, setAutoLock, justLocked, loadedModelName } from "./pose.js";
 import * as pose from "./pose.js";
-import { unlockVoice, say } from "./voice.js";
+import { unlockVoice, say, quiet } from "./voice.js";
 import { unlockAudio } from "./audio.js";
 import { requestLevel, level, LEVEL_TOL } from "./level.js";
 import { loadSettings, saveSettings } from "./config.js";
@@ -10,48 +10,51 @@ import { squatStart, squatFrame, squatEndSet, squatDebug, squatHistory } from ".
 import { benchStart, benchFrame, benchEndSet, benchDebug, benchHistory } from "./bench.js";
 import { startRecording, stopRecording, recordFrame, isRecording, shareLast, recordingStatus } from "./recorder.js";
 import { resetProfile } from "./profile.js";
-import { setupStart, setupFrame, setupStop } from "./setup.js";
+import { setupStart, setupFrame, setupStop, setupDone, setLens } from "./setup.js";
 
 const $ = id => document.getElementById(id);
 const log = t => $("log").textContent = t;
 
 // ---------- Настройки ----------
 const st = loadSettings();
-$("height").value = st.height;
-$("model").value = st.model;
-$("liveCues").value = st.liveCues ? "1" : "0";
-$("judge").value = st.judge;
-$("autoRec").value = st.autoRec ? "1" : "0";
-$("quality").value = st.quality;
-$("audio").value = st.audio ? "1" : "0";
-$("skeletonVideo").value = st.skeletonVideo ? "1" : "0";
+saveSettings(st);   // сохранить переход на новую версию настроек
+const FIELDS = ["height", "model", "liveCues", "judge", "autoRec", "quality", "audio", "skeletonVideo"];
+const BOOL = new Set(["liveCues", "autoRec", "audio", "skeletonVideo"]);
+for (const f of FIELDS) $(f).value = BOOL.has(f) ? (st[f] ? "1" : "0") : st[f];
 function readSettings() {
-  const h = parseFloat($("height").value);
-  Object.assign(st, {
-    height: h >= 140 && h <= 220 ? h : 178,
-    model: $("model").value,
-    liveCues: $("liveCues").value === "1",
-    judge: $("judge").value,
-    autoRec: $("autoRec").value === "1",
-    quality: $("quality").value,
-    audio: $("audio").value === "1",
-    skeletonVideo: $("skeletonVideo").value === "1",
-  });
+  for (const f of FIELDS) {
+    const v = $(f).value;
+    st[f] = BOOL.has(f) ? v === "1" : v;
+  }
+  const h = parseFloat(st.height); st.height = h >= 140 && h <= 220 ? h : 178;
   saveSettings(st);
   return st;
 }
 
+// ---------- Модель: авто — full, при низком FPS переключаемся на lite ----------
+const modelFor = m => (m === "auto" ? "full" : m);
+let lowFpsSec = 0, switching = false;
+async function autoModel(fps) {
+  if (st.model !== "auto" || switching || loadedModelName() !== "full" || !mode || mode === "live") return;
+  lowFpsSec = fps < 15 ? lowFpsSec + 1 : 0;
+  if (lowFpsSec >= 5) {
+    switching = true;
+    try { const d = await initPose("lite"); $("modelChip").textContent = "авто: lite · " + d; } catch {}
+    switching = false;
+  }
+}
+
 // ---------- Режимы ----------
-let booted = false, mode = null;
+let booted = false, mode = null, levelAsked = false;
 
 async function boot() {
   if (booted) return;
   log("Загружаю модель…");
-  const delegate = await initPose(st.model);
-  $("modelChip").textContent = st.model + " · " + delegate;
+  const delegate = await initPose(modelFor(st.model));
+  $("modelChip").textContent = (st.model === "auto" ? "авто: " : "") + modelFor(st.model) + " · " + delegate;
   log("Включаю камеру…");
-  await startCamera(undefined, st.quality);
-  startLoop(fps => { $("fps").textContent = fps; updateLevel(); updateRecButton(); });
+  await startCamera(undefined, st.quality, st.lens);
+  startLoop(fps => { $("fps").textContent = fps; updateLevel(); updateRecButton(); autoModel(fps); });
   booted = true;
   log("");
 }
@@ -66,19 +69,24 @@ function updateLevel() {
 }
 
 async function enter(m) {
-  // Всё, что требует «нажатия», — синхронно до первого await (правило iOS)
-  requestLevel(); unlockVoice(); unlockAudio();
+  // Всё, что требует «нажатия», — синхронно до первого await (правило iOS).
+  // Датчик уровня спрашиваем один раз за запуск приложения.
+  if (!levelAsked) { levelAsked = true; requestLevel(); }
+  unlockVoice(); unlockAudio();
   readSettings();
   try {
     await boot();
-    if (pose.quality !== st.quality) await startCamera(pose.facing, st.quality);   // качество поменяли в меню
+    if (pose.quality !== st.quality) await startCamera(pose.facing, st.quality, st.lens);   // качество поменяли в настройках
+    if (st.model !== "auto" && loadedModelName() !== st.model) {
+      const d = await initPose(st.model); $("modelChip").textContent = st.model + " · " + d;
+    }
   } catch (e) { log("Ошибка: " + (e.message || e)); console.error(e); return; }
-  mode = m;
+  mode = m; lowFpsSec = 0;
   $("start").hidden = true; $("stage").hidden = false;
-  $("live").hidden = m !== "live"; $("squat").hidden = m !== "squat"; $("bench").hidden = m !== "bench";
+  $("live").hidden = m !== "live"; $("squat").hidden = true; $("bench").hidden = true;
   $("statusChip").hidden = m === "live";
   clear();
-  if (m === "live") setHandler(withRec(liveFrame));
+  if (m === "live") { setAutoLock(false); setHandler(withRec(liveFrame)); }
   else runSetup();
   try { await navigator.wakeLock?.request("screen"); } catch {}
 }
@@ -89,20 +97,27 @@ function updateRecButton() {
   document.querySelectorAll("[data-rec]").forEach(b => { b.textContent = `■ ${m}:${sec} · ${Math.round(r.mb)} МБ`; });
 }
 
-const withRec = (fn, dbg) => (res, lm, ts) => { fn(res, lm, ts); if (isRecording()) recordFrame(lm, ts, dbg?.()); };
+const withRec = (fn, dbg) => (res, lm, ts) => {
+  fn(res, lm, ts);
+  if (justLocked() && mode !== "live") say("Вижу тебя", { repeatAfter: 15000 });
+  if (isRecording()) recordFrame(lm, ts, dbg?.());
+};
 
 function startMode() {
   setupStop(); clear();
+  quiet(4000);                 // первые секунды — не дёргаем подсказками, пока идёшь к снаряду
+  unlockTarget(); setAutoLock(true);   // «свой» — тот, кто ляжет/встанет на место и замрёт
   $("squat").hidden = mode !== "squat"; $("bench").hidden = mode !== "bench";
   if (mode === "squat") { squatStart(st); setHandler(withRec(squatFrame, squatDebug)); }
   if (mode === "bench") { benchStart(st); setHandler(withRec(benchFrame, benchDebug)); }
+  if (st.autoRec && !isRecording()) toggleRec();
 }
 
-/** Сначала выставляем камеру, потом — режим. Запись (если идёт) продолжается. */
+/** Настройка ракурса — у телефона. Запись (если идёт) продолжается. */
 function runSetup() {
-  unlockTarget();
+  setAutoLock(false); unlockTarget();
   $("squat").hidden = true; $("bench").hidden = true; clear();
-  setupStart(mode, () => { startMode(); if (st.autoRec && !isRecording()) toggleRec(); }, st);
+  setupStart(mode, startMode, st);
   setHandler(withRec(setupFrame, () => ({ state: "setup" })));
 }
 
@@ -124,20 +139,30 @@ async function toggleRec() {
 
 async function toMenu() {
   if (isRecording()) await toggleRec();
-  setupStop(); unlockTarget();
+  setupStop(); unlockTarget(); setAutoLock(false);
   setHandler(null); clear(); mode = null;
   $("stage").hidden = true; $("start").hidden = false;
 }
 
+// ---------- Кнопки ----------
 $("goLive").onclick = () => enter("live");
 $("goSquat").onclick = () => enter("squat");
 $("goBench").onclick = () => enter("bench");
+$("goSettings").onclick = () => { $("start").hidden = true; $("settings").hidden = false; };
+$("settingsBack").onclick = () => { readSettings(); $("settings").hidden = true; $("start").hidden = false; };
 $("resetProfile").onclick = () => { if (confirm("Сбросить накопленные замеры пропорций и наклона?")) { resetProfile(); log("Замеры сброшены"); } };
 document.querySelectorAll("[data-back]").forEach(b => b.onclick = toMenu);
 document.querySelectorAll("[data-flip]").forEach(b => b.onclick = () => flipCamera());
 document.querySelectorAll("[data-rec]").forEach(b => b.onclick = toggleRec);
 document.querySelectorAll("[data-setup]").forEach(b => b.onclick = runSetup);
-$("suSkip").onclick = () => { lockTarget(); startMode(); };   // пропустили настройку — «свой» тот, кто сейчас в кадре крупнее всех
+document.querySelectorAll("[data-lens]").forEach(b => b.onclick = async () => { await setLens(b.dataset.lens); saveSettings(st); });
+// карточки сворачиваются по нажатию — чтобы не закрывали кадр
+document.querySelectorAll("[data-collapse]").forEach(el => el.addEventListener("click", e => {
+  if (e.target.closest("button")) return;
+  el.classList.toggle("mini");
+}));
+$("suDone").onclick = () => setupDone();
+$("suCard").addEventListener("click", e => { if (!e.target.closest("button")) $("suCard").classList.toggle("open"); });
 $("recCoach").onclick = async () => { const r = await shareLast("coach"); if (r !== "ok") log(r); };
 $("recShare").onclick = async () => { const r = await shareLast("analysis"); if (r !== "ok") log(r); };
 $("recClose").onclick = () => { $("recDone").hidden = true; };

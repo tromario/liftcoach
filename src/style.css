@@ -82,3 +82,37 @@ button.rec-on{background:#c62828}
 .sq-panel table{margin:6px 0 4px;font-size:14px}
 .sq-panel td,.sq-panel th{padding:4px 3px}
 .sq-panel:empty{display:none}
+
+/* Ракурс v2 */
+.su-more{display:none;font-weight:500}
+.su-tips{margin:4px 0 0;padding-left:18px;color:#ddd;font-size:14px;line-height:1.4}
+.su-list li.eye .dot{background:#6f9bff}
+.su-lens{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+.su-lens button{flex:0 0 auto;padding:8px 14px;border-radius:10px}
+.su-lens button.on{background:var(--acc)}
+/* сворачиваемые карточки: нажми — останется одна строка */
+[data-collapse]{cursor:pointer}
+[data-collapse].mini{max-height:2.6em!important;overflow:hidden}
+[data-collapse].mini .su-tips,[data-collapse].mini .su-list,[data-collapse].mini .su-lens{display:none}
+.setup.mini .su-card{max-height:2.6em}
+
+/* Горизонтально: карточки — узкой колонкой слева, кадр открыт */
+@media (orientation: landscape) {
+  .hud{padding-top:calc(env(safe-area-inset-top) + 6px)}
+  .chip{padding:4px 8px;font-size:13px}
+  .su-card,.sq-panel{left:calc(env(safe-area-inset-left) + 10px);right:auto;width:min(38vw,380px);top:calc(env(safe-area-inset-top) + 44px);padding:8px 10px}
+  .su-card .wz-title{font-size:15px;margin:0 0 2px}
+  .su-card:not(.open) .su-tips{display:none}
+  .su-more{display:inline}
+  .su-tips{font-size:12px;line-height:1.3}
+  .su-list{font-size:12px;gap:2px;margin-top:6px}
+  .su-list .dot{width:9px;height:9px}
+  .su-lens{margin-top:6px}
+  .su-lens button{padding:6px 12px;font-size:13px}
+  .sq-panel{max-height:62vh;font-size:12px}
+  .sq-panel table{font-size:12px}
+  .su-hint,.wz-hint{left:auto;right:calc(env(safe-area-inset-right) + 12px);width:52vw;font-size:17px;bottom:calc(env(safe-area-inset-bottom) + 62px)}
+  .bar{padding:6px 10px calc(env(safe-area-inset-bottom) + 6px);background:linear-gradient(transparent,rgba(0,0,0,.6))}
+  .bar button{padding:8px 6px;font-size:14px}
+  .rec-done{left:auto;right:12px;width:min(52vw,480px);bottom:calc(env(safe-area-inset-bottom) + 56px)}
+}

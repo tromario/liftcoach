@@ -25,7 +25,7 @@ export function squatStart(settings) {
     ema: null,
     calib: profile.makeCalibrator(s => {
       profile.addSample(s); S.sampledThisSet = true; render();
-      if (!S.readySaid) { S.readySaid = true; say("Готов. Начинай подход", { force: true }); }
+      if (!S.readySaid) { S.readySaid = true; say("Готов", { repeatAfter: 60000 }); }
     }),
   };
   hint("Встань боком к камере", "bad");
@@ -45,7 +45,7 @@ function status(t) { $("modeStatus").textContent = t; }
 export function squatFrame(res, lm, ts) {
   if (!S) return;
   const fr = checkSide(lm);
-  if (!lm) { if (S.state === "stand") { hint(fr.hint, "bad"); say(fr.hint); } return; }
+  if (!lm) { if (S.state === "stand") { hint(fr.hint, "bad"); say(fr.hint, { persist: 3000, repeatAfter: 20000 }); } return; }
 
   const side = fr.side ?? nearSide(lm).side;
   const s = sideIdx(side);
@@ -53,7 +53,7 @@ export function squatFrame(res, lm, ts) {
 
   const inRep = S.state !== "stand";
   if (!fr.ok && !inRep) {
-    hint(fr.hint, "bad"); say(fr.hint); S.calib.reset(); status("Настройка");
+    hint(fr.hint, "bad"); say(fr.hint, { persist: 3000, repeatAfter: 20000 }); S.calib.reset(); status("Настройка");
     if (S.summarized) S.judgeSaid = false;   // ушёл из кадра после подхода — следующий подход снова с командой
     return;
   }
@@ -90,13 +90,13 @@ export function squatFrame(res, lm, ts) {
     }
 
     if (!Number.isFinite(S.scale)) {
-      status("Калибровка"); hint("Встань прямо боком и замри", "bad"); say("Встань прямо и замри");
+      status("Калибровка"); hint("Встань прямо боком и замри", "bad"); say("Встань прямо и замри", { persist: 3000, repeatAfter: 20000 });
     } else if (!S.sampledThisSet && S.calib.progress > 0 && !profile.proportions()) {
       status("Калибровка"); hint(`Замеряю… ${Math.round(S.calib.progress * 100)}%`, "ok");
     } else {
       status(S.set.length ? `Подход: ${S.set.length} повт.` : "Готов");
       hint(S.set.length ? "" : "Можно начинать", "ok");
-      if (!S.readySaid) { S.readySaid = true; say("Готов. Начинай подход", { force: true }); }
+      if (!S.readySaid) { S.readySaid = true; say("Готов"); }
     }
 
     // Команды судьи

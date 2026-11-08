@@ -34,15 +34,22 @@ const cmds = () => S.settings.judge === "en"
   ? { start: "Start", press: "Press", rack: "Rack" }
   : { start: "Старт", press: "Жим", rack: "Стойка" };
 
+/** Рабочая сторона — где лучше видна рука (плечо, локоть, запястье) */
+function armSide(lm) {
+  const v = i => lm[i].visibility ?? 0;
+  const L = v(11) + v(13) + v(15) + 0.5 * v(23), R = v(12) + v(14) + v(16) + 0.5 * v(24);
+  return L >= R ? "L" : "R";
+}
+
 function framing(lm) {
   if (!lm) return { ok: false, hint: "Не вижу тебя" };
   const lv = levelHint(); if (lv) return { ok: false, hint: lv };
-  const { side } = nearSide(lm); const s = sideIdx(side);
+  const side = armSide(lm); const s = sideIdx(side);
   const need = [s.sh, s.el, s.wr, s.hip];
   if (need.some(i => lm[i].x < 0.01 || lm[i].x > 0.99 || lm[i].y < 0.01 || lm[i].y > 0.99))
     return { ok: false, hint: "Не помещаешься, отодвинь камеру", side };
   if (need.some(i => (lm[i].visibility ?? 0) < CFG.minVis))
-    return { ok: false, hint: "Плохо вижу руку и таз, сдвинь камеру к ногам", side };
+    return { ok: false, hint: "Рука закрыта, после подхода сдвинь камеру к ногам", side };
   const sh = px(lm, s.sh), hip = px(lm, s.hip);
   const tilt = Math.abs(Math.atan2(hip.y - sh.y, Math.abs(hip.x - sh.x))) * 180 / Math.PI;
   if (tilt > 35) return { ok: false, hint: "Камера должна смотреть сбоку на скамью", side };
@@ -55,12 +62,12 @@ function framing(lm) {
 export function benchFrame(res, lm, ts) {
   if (!S) return;
   const fr = framing(lm);
-  if (!lm) { if (S.state === "idle" || S.state === "top") { hint(fr.hint, "bad"); say(fr.hint); } return; }
-  const s = sideIdx(fr.side ?? nearSide(lm).side);
+  if (!lm) { if (S.state === "idle" || S.state === "top") { hint(fr.hint, "bad"); say(fr.hint, { persist: 3000, repeatAfter: 20000 }); } return; }
+  const s = sideIdx(fr.side ?? armSide(lm));
   drawSkeleton(lm, { highlight: [s.sh, s.el, s.wr, s.hip] });
 
   const inRep = S.state === "down" || S.state === "pause" || S.state === "up";
-  if (!fr.ok && !inRep) { hint(fr.hint, "bad"); say(fr.hint); status("Настройка"); return; }
+  if (!fr.ok && !inRep) { hint(fr.hint, "bad"); say(fr.hint, { persist: 3000, repeatAfter: 20000 }); status("Настройка"); return; }
 
   const P = i => px(lm, i);
   const sh = P(s.sh), el = P(s.el), wr = P(s.wr), hip = P(s.hip);

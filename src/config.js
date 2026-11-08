@@ -18,7 +18,7 @@ export const CFG = {
   setEndStillMs: 3500,
   // Кадр
   minVis: 0.5,
-  sizeMin: 0.45, sizeMax: 0.92,  // доля высоты кадра от глаз до пола
+  sizeMin: 0.35, sizeMax: 0.92,  // доля высоты кадра от глаз до пола (с 0.5× человек мельче)
   sideMaxRatio: 0.38,            // ширина плеч / длина корпуса — больше значит стоишь не боком
   // Жим лёжа
   bench: {
@@ -41,15 +41,22 @@ export const CFG = {
     pathFwdCm: 3,          // гриф на подъёме ушёл к ногам больше — «Назад к плечам»
     descentMinS: 0.6,      // опускание быстрее — «слишком быстро»
     fullLockElbow: 165,    // локоть на вершине меньше — не дожал
-    torsoMin: 0.12, torsoMax: 0.55,  // длина корпуса / ширина кадра
+    torsoMin: 0.08, torsoMax: 0.55,  // длина корпуса / ширина кадра (с 0.5× корпус мельче)
   },
   // Антропометрия
   eyeHeightRatio: 0.936,         // высота глаз / рост (стандартная антропометрия)
 };
 
 export const SETTINGS_KEY = "lc.settings.v1";
+const SETTINGS_VER = 2;
 export function loadSettings() {
-  const def = { height: 178, model: "full", liveCues: true, judge: "off", autoRec: true, quality: "720", audio: false, skeletonVideo: false };
-  try { return { ...def, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") }; } catch { return def; }
+  const def = { v: SETTINGS_VER, height: 178, model: "auto", liveCues: true, judge: "off", autoRec: false,
+    quality: "720", audio: false, skeletonVideo: false, lens: "wide" };
+  let s;
+  try { s = { ...def, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") }; } catch { s = { ...def }; }
+  if ((s.v || 1) < 2) {   // переход на v2: запись — вручную, модель — авто
+    s.autoRec = false; if (s.model === "full") s.model = "auto"; s.v = 2;
+  }
+  return s;
 }
 export function saveSettings(s) { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch {} }

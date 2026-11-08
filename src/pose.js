@@ -19,43 +19,71 @@ const RES = { "720": { width: 1280, height: 720 }, "1080": { width: 1920, height
 let handler = null;
 let running = false;
 
+export const loadedModelName = () => loadedModel;
+
 export async function initPose(model) {
   if (landmarker && loadedModel === model) return landmarker.__delegate;
-  landmarker?.close();
   const fileset = await FilesetResolver.forVisionTasks(BASE + "mediapipe/wasm");
   const opts = delegate => ({
     baseOptions: { modelAssetPath: MODELS[model], delegate },
-    runningMode: "VIDEO", numPoses: 3,      // ищем до 3 людей, дальше выбираем «своего»
+    runningMode: "VIDEO", numPoses: 2,      // ты + один посторонний; каждый человек — отдельный прогон модели, больше = медленнее
     minPoseDetectionConfidence: .5, minPosePresenceConfidence: .5, minTrackingConfidence: .5,
   });
-  let delegate = "GPU";
-  try { landmarker = await PoseLandmarker.createFromOptions(fileset, opts("GPU")); }
-  catch { delegate = "CPU"; landmarker = await PoseLandmarker.createFromOptions(fileset, opts("CPU")); }
-  landmarker.__delegate = delegate;
-  loadedModel = model;
+  let delegate = "GPU", next;
+  try { next = await PoseLandmarker.createFromOptions(fileset, opts("GPU")); }
+  catch { delegate = "CPU"; next = await PoseLandmarker.createFromOptions(fileset, opts("CPU")); }
+  next.__delegate = delegate;
+  const old = landmarker; landmarker = next; loadedModel = model; old?.close();   // подмена без паузы
   return delegate;
 }
 
-export async function startCamera(f = facing, q = quality) {
-  facing = f; quality = q;
-  const r = RES[q] || RES["720"];
+export let lens = "wide";            // "wide" — 1×, "ultra" — 0.5×
+export let lensNote = "";            // почему 0.5× не включился
+
+async function findUltraWide() {
+  const ds = await navigator.mediaDevices.enumerateDevices();
+  // iOS отдаёт широкоугольную камеру отдельным устройством (iOS 16.4+); названия зависят от языка системы
+  return ds.find(d => d.kind === "videoinput" && /ultra|сверхшир|ультрашир/i.test(d.label)) || null;
+}
+
+async function open(constraints) {
   stream?.getTracks().forEach(t => t.stop());
-  stream = await navigator.mediaDevices.getUserMedia({
-    audio: false,
-    video: { facingMode: facing, width: { ideal: r.width }, height: { ideal: r.height }, frameRate: { ideal: 30 } },
-  });
+  stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: constraints });
   video.srcObject = stream;
   await video.play();
+}
+
+export async function startCamera(f = facing, q = quality, l = lens) {
+  facing = f; quality = q; lens = l; lensNote = "";
+  const r = RES[q] || RES["720"];
+  const base = { width: { ideal: r.width }, height: { ideal: r.height }, frameRate: { ideal: 30 } };
+  if (f === "environment" && l === "ultra") {
+    let d = await findUltraWide();
+    if (!d && !stream) { await open({ ...base, facingMode: f }); d = await findUltraWide(); }   // названия камер видны только после разрешения
+    if (d) await open({ ...base, deviceId: { exact: d.deviceId } });
+    else {
+      await open({ ...base, facingMode: f });
+      // запасной путь: «виртуальная» камера с зумом меньше 1
+      const t = stream.getVideoTracks()[0], caps = t.getCapabilities?.() || {};
+      if (caps.zoom && caps.zoom.min < 1) { try { await t.applyConstraints({ advanced: [{ zoom: caps.zoom.min }] }); } catch { lens = "wide"; } }
+      else { lens = "wide"; lensNote = "Safari не дал широкоугольную камеру 0.5×"; }
+    }
+  } else {
+    await open({ ...base, facingMode: f });
+  }
   const m = facing === "user";
   video.classList.toggle("mirror", m); canvas.classList.toggle("mirror", m);
+  return lens;
 }
 
 export const flipCamera = () => startCamera(facing === "environment" ? "user" : "environment");
 
 // ---------- Отслеживание «своего» человека ----------
-// До фиксации берём самого крупного в кадре. После фиксации (конец настройки ракурса) —
-// того, кто ближе к прошлому положению и похож по размеру. Остальных игнорируем.
-let target = null, locked = false;
+// До фиксации берём самого крупного в кадре. Фиксация — автоматически, когда крупный человек
+// ~1.5 с держится на одном месте (лёг на скамью / встал под гриф), или вручную.
+// После фиксации берём того, кто ближе к прошлому положению и похож по размеру.
+// Две сильно перекрывающиеся фигуры — это один человек (модель иногда «двоит» ноги и корпус).
+let target = null, locked = false, autoLock = false, cand = null;
 const TRACK_IDX = [0, 11, 12, 23, 24, 25, 26, 27, 28];   // без рук — их положение сильно меняется
 
 function bodyBox(lm) {
@@ -64,20 +92,43 @@ function bodyBox(lm) {
   const W = video.videoWidth, H = video.videoHeight;
   const xs = pts.map(p => p.x * W), ys = pts.map(p => p.y * H);
   const core = [11, 12, 23, 24].map(i => lm[i]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
   return {
     x: core.reduce((s, p) => s + p.x, 0) / 4 * W,
     y: core.reduce((s, p) => s + p.y, 0) / 4 * H,
-    size: Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) || 1,
+    size: Math.hypot(x1 - x0, y1 - y0) || 1,
+    x0, x1, y0, y1,
     vis: pts.reduce((s, p) => s + (p.visibility ?? 0), 0) / pts.length,
   };
 }
 
+/** Доля перекрытия меньшей рамки большей */
+function overlap(a, b) {
+  const w = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0), h = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0);
+  if (w <= 0 || h <= 0) return 0;
+  const area = r => Math.max(1, (r.x1 - r.x0) * (r.y1 - r.y0));
+  return (w * h) / Math.min(area(a), area(b));
+}
+const score = b => b.size * b.vis;
+
 function pickPerson(list, ts) {
   const boxes = list.map(bodyBox);
+  // склейка двойников
+  for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+    const a = boxes[i], b = boxes[j];
+    if (a && b && overlap(a, b) > 0.5) { if (score(a) >= score(b)) boxes[j] = null; else boxes[i] = null; }
+  }
   let best = -1;
   if (!locked || !target) {
     let bs = 0;
-    boxes.forEach((b, i) => { if (b && b.size * b.vis > bs) { bs = b.size * b.vis; best = i; } });
+    boxes.forEach((b, i) => { if (b && score(b) > bs) { bs = score(b); best = i; } });
+    // автофиксация: крупный человек держится на месте 1.5 с
+    if (autoLock && best >= 0) {
+      const b = boxes[best], diag = Math.hypot(video.videoWidth, video.videoHeight);
+      if (cand && Math.hypot(b.x - cand.x, b.y - cand.y) < 0.25 * b.size) cand.t1 = ts;
+      else cand = { x: b.x, y: b.y, t0: ts, t1: ts };
+      if (b.size > 0.22 * diag && cand.t1 - cand.t0 > 1500) { locked = true; lockedNow = true; }
+    }
   } else {
     const radius = target.size * (ts - target.t < 500 ? 0.6 : 1.0);   // потеряли — ищем шире
     let bd = Infinity;
@@ -97,14 +148,21 @@ function pickPerson(list, ts) {
   return best;
 }
 
+let lockedNow = false;
+/** true один раз — сразу после автофиксации (чтобы сказать «Вижу тебя») */
+export function justLocked() { const v = lockedNow; lockedNow = false; return v; }
 /** Зафиксировать текущего человека как «своего» */
 export function lockTarget() { if (target) locked = true; return locked; }
 /** Снять фиксацию — снова берём самого крупного */
-export function unlockTarget() { locked = false; target = null; }
+export function unlockTarget() { locked = false; target = null; cand = null; }
+/** Включить автофиксацию (в режимах присед/жим) */
+export function setAutoLock(on) { autoLock = on; }
 export const isLocked = () => locked;
 
 /** handler(result, lm|null, ts) вызывается на каждый кадр */
 export function setHandler(fn) { handler = fn; }
+
+const inC = document.createElement("canvas"), inG = inC.getContext("2d");
 
 export function startLoop(onFps) {
   if (running) return; running = true;
@@ -114,7 +172,12 @@ export function startLoop(onFps) {
     if (video.readyState < 2 || !landmarker) return;
     if (canvas.width !== video.videoWidth) { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
     const ts = performance.now(); if (ts <= lastTs) return; lastTs = ts;
-    const res = landmarker.detectForVideo(video, ts);
+    // модели хватает 640 px по длинной стороне: меньше данных гоним в GPU — выше FPS
+    const k = Math.min(1, 640 / Math.max(video.videoWidth, video.videoHeight));
+    const iw = Math.round(video.videoWidth * k), ih = Math.round(video.videoHeight * k);
+    if (inC.width !== iw || inC.height !== ih) { inC.width = iw; inC.height = ih; }
+    inG.drawImage(video, 0, 0, iw, ih);
+    const res = landmarker.detectForVideo(inC, ts);
     frames++;
     if (ts - fpsT > 1000) { onFps?.(Math.round(frames * 1000 / (ts - fpsT))); frames = 0; fpsT = ts; }
     const all = res.landmarks || [];
