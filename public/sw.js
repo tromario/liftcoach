@@ -1,7 +1,7 @@
 // Кэш: приложение, библиотека MediaPipe и модель сохраняются после первого запуска,
 // дальше работает без интернета.
-const CACHE = "liftcoach-v2";
-const SHELL = ["./", "index.html", "manifest.json", "icon-180.png", "icon-192.png", "icon-512.png", "anim/squat.html", "anim/deadlift.html"];
+const CACHE = "liftcoach-v3";
+const SHELL = ["./", "index.html", "manifest.json", "icon-180.png", "icon-192.png", "icon-512.png", "anim/squat.html", "anim/bench.html", "anim/deadlift.html"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)));
