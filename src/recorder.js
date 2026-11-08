@@ -1,9 +1,10 @@
 // Запись подхода: сырое видео с камеры + покадровые данные (JSON).
 // Видео — тренеру и для разбора; данные — для разбора (скелет по ним восстанавливается).
-// Ограничения по длительности нет. Всё копится в памяти телефона (~37 МБ/мин при 5 Мбит/с).
-import { video, facing } from "./pose.js";
+// Ограничения по длительности нет. Всё копится в памяти телефона.
+// 720p — 5 Мбит/с (~37 МБ/мин), 1080p — 10 Мбит/с (~75 МБ/мин). Звук — по настройке.
+import { video, facing, quality } from "./pose.js";
 
-const BITRATE = 5_000_000;
+const BITRATE = { "720": 5_000_000, "1080": 10_000_000 };
 let rec = null;
 let last = null;
 
@@ -15,14 +16,28 @@ function pickMime() {
 export const isRecording = () => !!rec;
 export const lastRecording = () => last;
 
-export function startRecording(meta) {
+/** Микрофон берём только на время записи — после стопа AirPods возвращаются в обычный режим */
+async function getMic() {
+  try {
+    const s = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true }, video: false });
+    return s.getAudioTracks()[0] || null;
+  } catch (e) { console.warn("mic", e); return null; }
+}
+
+export async function startRecording(meta, { audio = false } = {}) {
   if (rec || !window.MediaRecorder || !video.srcObject) return false;
   const mime = pickMime();
-  const mr = new MediaRecorder(video.srcObject, mime ? { mimeType: mime, videoBitsPerSecond: BITRATE } : undefined);
+  const mic = audio ? await getMic() : null;
+  const tracks = [...video.srcObject.getVideoTracks(), ...(mic ? [mic] : [])];
+  const src = new MediaStream(tracks);
+  const opts = { videoBitsPerSecond: BITRATE[quality] || BITRATE["720"], ...(mic ? { audioBitsPerSecond: 128_000 } : {}) };
+  if (mime) opts.mimeType = mime;
+  const mr = new MediaRecorder(src, opts);
   const chunks = [];
   let bytes = 0;
   mr.ondataavailable = e => { if (e.data.size) { chunks.push(e.data); bytes += e.data.size; if (rec) rec.bytes = bytes; } };
-  rec = { mr, chunks, bytes: 0, mime: mr.mimeType || mime, t0: performance.now(), frames: [], meta };
+  rec = { mr, chunks, bytes: 0, mime: mr.mimeType || mime, t0: performance.now(), frames: [], meta, mic, audioWanted: audio };
   rec.stopped = new Promise(res => { mr.onstop = res; });
   mr.start(1000);
   return true;
@@ -51,19 +66,20 @@ export async function stopRecording(extra = {}) {
   const r = rec; rec = null;
   if (r.mr.state !== "inactive") r.mr.stop();
   await r.stopped;
+  r.mic?.stop();
   const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
   const ext = r.mime.includes("mp4") ? "mp4" : "webm";
   const base = `liftcoach-${r.meta.mode}-${stamp}`;
   const videoFile = new File(r.chunks, `${base}.${ext}`, { type: r.mime || "video/mp4" });
   const data = {
     app: "liftcoach", version: 2, ...r.meta, recordedAt: new Date().toISOString(),
-    video: { file: videoFile.name, width: video.videoWidth, height: video.videoHeight, facing },
+    video: { file: videoFile.name, width: video.videoWidth, height: video.videoHeight, facing, quality, audio: !!r.mic },
     note: "t — секунды от начала видео; lm — 33 точки MediaPipe [x, y, z, visibility] в долях кадра",
     ...extra,
     frames: r.frames,
   };
   const dataFile = new File([JSON.stringify(data)], `${base}.json`, { type: "application/json" });
-  last = { videoFile, dataFile };
+  last = { videoFile, dataFile, audio: !!r.mic, audioWanted: r.audioWanted };
   return last;
 }
 

@@ -14,6 +14,8 @@ const ctx = canvas.getContext("2d");
 
 let landmarker = null, loadedModel = null, stream = null;
 export let facing = "environment";
+export let quality = "720";
+const RES = { "720": { width: 1280, height: 720 }, "1080": { width: 1920, height: 1080 } };
 let handler = null;
 let running = false;
 
@@ -34,12 +36,13 @@ export async function initPose(model) {
   return delegate;
 }
 
-export async function startCamera(f = facing) {
-  facing = f;
+export async function startCamera(f = facing, q = quality) {
+  facing = f; quality = q;
+  const r = RES[q] || RES["720"];
   stream?.getTracks().forEach(t => t.stop());
   stream = await navigator.mediaDevices.getUserMedia({
     audio: false,
-    video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
+    video: { facingMode: facing, width: { ideal: r.width }, height: { ideal: r.height }, frameRate: { ideal: 30 } },
   });
   video.srcObject = stream;
   await video.play();

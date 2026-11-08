@@ -1,5 +1,6 @@
 import "./style.css";
 import { initPose, startCamera, startLoop, setHandler, flipCamera, clear } from "./pose.js";
+import * as pose from "./pose.js";
 import { unlockVoice, say } from "./voice.js";
 import { unlockAudio } from "./audio.js";
 import { requestLevel, level, LEVEL_TOL } from "./level.js";
@@ -21,6 +22,8 @@ $("model").value = st.model;
 $("liveCues").value = st.liveCues ? "1" : "0";
 $("judge").value = st.judge;
 $("autoRec").value = st.autoRec ? "1" : "0";
+$("quality").value = st.quality;
+$("audio").value = st.audio ? "1" : "0";
 function readSettings() {
   const h = parseFloat($("height").value);
   Object.assign(st, {
@@ -29,6 +32,8 @@ function readSettings() {
     liveCues: $("liveCues").value === "1",
     judge: $("judge").value,
     autoRec: $("autoRec").value === "1",
+    quality: $("quality").value,
+    audio: $("audio").value === "1",
   });
   saveSettings(st);
   return st;
@@ -43,7 +48,7 @@ async function boot() {
   const delegate = await initPose(st.model);
   $("modelChip").textContent = st.model + " · " + delegate;
   log("Включаю камеру…");
-  await startCamera();
+  await startCamera(undefined, st.quality);
   startLoop(fps => { $("fps").textContent = fps; updateLevel(); updateRecButton(); });
   booted = true;
   log("");
@@ -64,6 +69,7 @@ async function enter(m) {
   readSettings();
   try {
     await boot();
+    if (pose.quality !== st.quality) await startCamera(pose.facing, st.quality);   // качество поменяли в меню
   } catch (e) { log("Ошибка: " + (e.message || e)); console.error(e); return; }
   mode = m;
   $("start").hidden = true; $("stage").hidden = false;
@@ -99,7 +105,7 @@ function runSetup() {
 
 async function toggleRec() {
   if (!isRecording()) {
-    if (!startRecording({ mode, settings: { ...st } })) { say("Запись не поддерживается", { force: true }); return; }
+    if (!(await startRecording({ mode, settings: { ...st } }, { audio: st.audio }))) { say("Запись не поддерживается", { force: true }); return; }
     document.querySelectorAll("[data-rec]").forEach(b => { b.textContent = "■ Стоп"; b.classList.add("rec-on"); });
     say("Запись", { force: true });
   } else {
@@ -107,7 +113,7 @@ async function toggleRec() {
     const hist = mode === "squat" ? squatHistory() : mode === "bench" ? benchHistory() : null;
     const r = await stopRecording({ history: hist });
     if (r) {
-      $("recInfo").textContent = `видео ${(r.videoFile.size / 1e6).toFixed(0)} МБ · данные ${(r.dataFile.size / 1e6).toFixed(1)} МБ`;
+      $("recInfo").textContent = `видео ${(r.videoFile.size / 1e6).toFixed(0)} МБ${r.audio ? " со звуком" : r.audioWanted ? " без звука (нет доступа к микрофону)" : ""} · данные ${(r.dataFile.size / 1e6).toFixed(1)} МБ`;
       $("recDone").hidden = false;
     }
   }

@@ -49,7 +49,7 @@ export const CFG = {
 
 export const SETTINGS_KEY = "lc.settings.v1";
 export function loadSettings() {
-  const def = { height: 178, model: "full", liveCues: true, judge: "off", autoRec: true };
+  const def = { height: 178, model: "full", liveCues: true, judge: "off", autoRec: true, quality: "720", audio: false };
   try { return { ...def, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") }; } catch { return def; }
 }
 export function saveSettings(s) { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch {} }
