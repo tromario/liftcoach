@@ -20,6 +20,7 @@ $("height").value = st.height;
 $("model").value = st.model;
 $("liveCues").value = st.liveCues ? "1" : "0";
 $("judge").value = st.judge;
+$("autoRec").value = st.autoRec ? "1" : "0";
 function readSettings() {
   const h = parseFloat($("height").value);
   Object.assign(st, {
@@ -27,6 +28,7 @@ function readSettings() {
     model: $("model").value,
     liveCues: $("liveCues").value === "1",
     judge: $("judge").value,
+    autoRec: $("autoRec").value === "1",
   });
   saveSettings(st);
   return st;
@@ -91,7 +93,7 @@ function startMode() {
 /** Сначала выставляем камеру, потом — режим. Запись (если идёт) продолжается. */
 function runSetup() {
   $("squat").hidden = true; $("bench").hidden = true; clear();
-  setupStart(mode, startMode, st);
+  setupStart(mode, () => { startMode(); if (st.autoRec && !isRecording()) toggleRec(); }, st);
   setHandler(withRec(setupFrame, () => ({ state: "setup" })));
 }
 
