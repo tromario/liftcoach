@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Присед широкой стойкой — LiftCoach</title>
+<style>
+/* Layout: заголовок-строка, затем три проекции одной 3D-модели в ряд (стопкой на телефоне), под ними панель управления и подсказки по фазам */
+:root{
+  --bg:#f3f4f1; --panel:#ffffff; --fg:#1d2420; --muted:#66706a; --line:#d5d9d3;
+  --body:#2b3a33; --far:#9aa69f; --bar:#2a2f2c; --plate:#c23b2e; --accent:#1f7a5a; --warn:#c77d12; --guide:#3a6fd8; --rack:#b4bdb7;
+  --ff-d:-apple-system,"Arial Narrow",Arial,sans-serif; --ff-m:ui-monospace,Menlo,monospace;
+}
+:root[data-theme="dark"]{
+  --bg:#000; --panel:#141414; --fg:#f2f2f2; --muted:#9a9a9a; --line:#2a2a2a;
+  --body:#d9e4dd; --far:#5d6b64; --bar:#c9d1cc; --plate:#e0584a; --accent:#ff5a36; --warn:#e9a640; --guide:#6f9bff; --rack:#4a5650; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--ff-d);font-size:16px}
+.wrap{max-width:1180px;margin:0 auto;padding-top:calc(env(safe-area-inset-top,0px) + 12px);padding-bottom:calc(env(safe-area-inset-bottom,0px) + 40px);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:18px}
+.back{display:inline-block;color:var(--accent);text-decoration:none;font-weight:600;font-size:17px;padding:6px 0}
+h1{font-size:clamp(26px,4vw,38px);margin:0;letter-spacing:.01em;text-wrap:balance}
+.sub{color:var(--muted);margin:4px 0 0;max-width:70ch;line-height:1.45}
+.views{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:760px){.views{grid-template-columns:1fr}}
+.view{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;min-width:0;display:grid;gap:6px}
+.view h2{margin:0;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+canvas{width:100%;aspect-ratio:4/5;display:block;max-width:100%}
+.ctrl{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+button{font:600 15px var(--ff-d);background:var(--accent);color:#fff;border:0;border-radius:8px;padding:8px 16px;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--guide);outline-offset:2px}
+label{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:14px}
+input[type=range]{width:160px;accent-color:var(--accent)}
+.phase{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;align-items:baseline}
+.phase .name{font-weight:700;font-size:20px;color:var(--accent)}
+.phase .cue{font-size:17px;line-height:1.4}
+.readout{font-family:var(--ff-m);font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px 18px;font-variant-numeric:tabular-nums}
+.readout b{color:var(--fg);font-weight:600}
+.ok{color:#3ddc84!important}.no{color:var(--warn)!important}
+.cues{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.cue-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
+.cue-card h3{margin:0 0 6px;font-size:16px}
+.cue-card ul{margin:0;padding-left:18px;line-height:1.5;color:var(--fg)}
+.prof{border:0;margin:0;padding:0;display:flex;gap:14px}.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted)}
+.sw{display:inline-block;width:18px;height:3px;vertical-align:middle;margin-right:6px;border-radius:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="../">← LiftCoach</a>
+  <header>
+    <h1>Присед широкой стойкой</h1>
+    <p class="sub">Полный подход: съём со стоек, три шага назад, два повтора и возврат на крюки. Одна модель — три ракурса. «Мои пропорции» взяты с твоих видео (рост 178 см): бедро ≈ голень, корпус длиннее среднего, стопы ≈ 2 ширины плеч, носки на ~38°, наклон корпуса внизу ≈ 45–50°, как на твоих видео. Гриф на трапециях. Колени идут строго по носкам, таз уходит назад и вниз, гриф всё время над серединой стопы.</p>
+  </header>
+
+  <div class="views">
+    <div class="view"><h2>Сбоку</h2><canvas id="c1" aria-label="Вид сбоку"></canvas></div>
+    <div class="view"><h2>Спереди</h2><canvas id="c2" aria-label="Вид спереди"></canvas></div>
+    <div class="view"><h2>45° спереди-сбоку</h2><canvas id="c3" aria-label="Вид 45 градусов"></canvas></div>
+  </div>
+
+  <div class="ctrl">
+    <button id="play" type="button">Пауза</button>
+    <label for="speed">Скорость <input id="speed" type="range" min="0.25" max="1.5" step="0.05" value="0.6"></label>
+    <label for="scrub">Кадр <input id="scrub" type="range" min="0" max="1" step="0.001" value="0"></label>
+    <fieldset class="prof"><legend class="vh">Пропорции</legend>
+      <label for="p-me"><input type="radio" name="prof" id="p-me" value="me" checked> Мои пропорции</label>
+      <label for="p-avg"><input type="radio" name="prof" id="p-avg" value="avg"> Типичные</label>
+    </fieldset>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--guide)"></i>середина стопы</span>
+      <span><i class="sw" style="background:var(--warn)"></i>верх колена</span>
+      <span><i class="sw" style="background:var(--far)"></i>дальняя сторона</span>
+    </div>
+  </div>
+
+  <div class="view phase-box">
+    <div class="phase"><span class="name" id="pname">Старт</span><span class="cue" id="pcue"></span></div>
+    <div class="readout">
+      <span>глубина: <b id="r-depth">—</b></span>
+      <span>наклон корпуса: <b id="r-torso">—</b></span>
+      <span>наклон голени: <b id="r-shin">—</b></span>
+      <span>гриф vs середина стопы: <b id="r-bar">—</b></span>
+    </div>
+  </div>
+
+  <div class="cues">
+    <div class="cue-card"><h3>Съём и отшагивание</h3><ul>
+      <li>Крюки на уровне середины груди: гриф снимается из чуть согнутых ног.</li>
+      <li>Стопы под грифом, вдох, пресс — встаёшь ногами.</li>
+      <li>Три шага: назад, назад и в сторону, в сторону. Без лишних перестановок.</li></ul></div>
+    <div class="cue-card"><h3>Постановка</h3><ul>
+      <li>Стопы примерно в 1,8 раза шире плеч, носки наружу на 30–40°.</li>
+      <li>Вес на середине стопы: пятка, основание большого и мизинца.</li>
+      <li>Гриф на трапециях, лопатки сведены, локти вниз-назад.</li></ul></div>
+    <div class="cue-card"><h3>Спуск</h3><ul>
+      <li>Вдох в живот и бока, пресс как на удар — до самого верха.</li>
+      <li>Таз назад и вниз одновременно, колени разводишь по носкам.</li>
+      <li>Голень почти вертикальна, поясница нейтральна.</li></ul></div>
+    <div class="cue-card"><h3>Низ</h3><ul>
+      <li>Складка бедра на 2–3 см ниже верха колена.</li>
+      <li>Колени над носками, не внутрь.</li>
+      <li>Без расслабления и отскока: напряжение не сбрасываешь.</li></ul></div>
+    <div class="cue-card"><h3>Подъём</h3><ul>
+      <li>«Грудь и затылок в гриф» — плечи и таз растут вместе.</li>
+      <li>Колени продолжаешь толкать наружу.</li>
+      <li>Таз не выстреливает вверх раньше груди.</li></ul></div>
+  </div>
+</div>
+
+<script>
+(function(){
+const PROFILES={
+  me:{shin:.44,thigh:.43,torso:.555,neck:.10,head:.11,hipW:.10,shW:.18,ankle:.40,toe:38*Math.PI/180,foot:.26,zBot:-.30},
+  avg:{shin:.44,thigh:.46,torso:.52,neck:.10,head:.11,hipW:.10,shW:.20,ankle:.34,toe:35*Math.PI/180,foot:.24,zBot:-.24}
+};
+let L=PROFILES.me;
+function solveBottom(){ // подбирает высоту таза так, чтобы складка бедра была на 3 см ниже верха колена
+  let lo=.25,hi=.75;
+  for(let i=0;i<40;i++){const y=(lo+hi)/2;L.yBot=y;const P=pose(1,W());
+    const crease=(P.hL.y+P.hR.y)/2-.03,kt=Math.max(P.kL.y,P.kR.y)+.035;
+    if(kt-crease>.03) lo=y; else hi=y;}
+}
+const mid=.06; // середина стопы впереди лодыжки по оси z
+const ZS=.80;           // насколько далеко от рабочей точки стоят крюки
+const RACK_Z=ZS+mid;    // гриф на крюках
+const NARROW=.15, NTOE=12*Math.PI/180;
+const ease=x=>x<.5?2*x*x:1-Math.pow(-2*x+2,2)/2;
+const lerp=(a,b,f)=>a+(b-a)*f;
+function feetSet(){return{L:{x:-NARROW,z:ZS,toe:NTOE,lift:0},R:{x:NARROW,z:ZS,toe:NTOE,lift:0}};}
+function cp(F){return{L:{...F.L},R:{...F.R}};}
+function stepFoot(F,key,to,f){const a=F[key],e=ease(f);const r=cp(F);r[key]={x:lerp(a.x,to.x,e),z:lerp(a.z,to.z,e),toe:lerp(a.toe,to.toe,e),lift:.07*Math.sin(Math.PI*f)};return r;}
+// Последовательность: под гриф → съём → 3 шага назад → 2 повтора → 3 шага вперёд → на крюки
+const F0=feetSet();
+const W=()=>({L:{x:-L.ankle,z:0,toe:L.toe,lift:0},R:{x:L.ankle,z:0,toe:L.toe,lift:0}});
+function buildPhases(){
+  const F1=cp(F0);F1.R={x:NARROW,z:ZS-.40,toe:NTOE,lift:0};
+  const F2=cp(F1);F2.L={x:-L.ankle,z:0,toe:L.toe,lift:0};
+  const F3=W();
+  const sq=[
+    {n:'Старт',c:'Вдох в живот и бока, пресс напряжён. Вес на середине стопы.',d:.8,s:()=>0},
+    {n:'Спуск',c:'Таз назад и вниз, колени разводишь по линии носков. Голень почти вертикальна.',d:1.7,s:f=>ease(f)},
+    {n:'Низ',c:'Складка бедра чуть ниже верха колена. Колени над носками, спина нейтральна.',d:.35,s:()=>1},
+    {n:'Подъём',c:'Грудь и затылок в гриф, колени наружу. Таз и плечи поднимаются вместе.',d:1.3,s:f=>1-ease(f)}
+  ].map(p=>({...p,F:()=>F3}));
+  return [
+    {n:'Под гриф',c:'Гриф на трапециях, хват, лопатки сведены. Стопы прямо под грифом на ширине таза.',d:1.0,s:()=>.13,F:()=>F0,rack:true},
+    {n:'Съём',c:'Вдох, пресс как на удар — и встаёшь ногами. Гриф снимаешь ногами, а не спиной.',d:.9,s:f=>.13*(1-ease(f)),F:()=>F0,rack:true},
+    {n:'Шаг 1',c:'Короткий шаг назад одной ногой, корпус неподвижен.',d:.7,s:()=>0,F:f=>stepFoot(F0,'R',F1.R,f)},
+    {n:'Шаг 2',c:'Вторая нога назад и сразу в сторону, на рабочую ширину.',d:.8,s:()=>0,F:f=>stepFoot(F1,'L',F2.L,f)},
+    {n:'Шаг 3',c:'Первая нога в сторону — стойка готова. Всего три шага, без лишних перестановок.',d:.8,s:()=>0,F:f=>stepFoot(F2,'R',F3.R,f)},
+    ...sq, ...sq.map(p=>({...p,n:p.n+' · 2'})),
+    {n:'Возврат',c:'Шаг вперёд одной ногой, взгляд на крюки.',d:.8,s:()=>0,F:f=>stepFoot(F3,'R',F1.R,f)},
+    {n:'Возврат',c:'Вторая нога вперёд, к грифу.',d:.8,s:()=>0,F:f=>stepFoot(cp({L:F3.L,R:F1.R}),'L',F0.L,f)},
+    {n:'Возврат',c:'Подходишь до касания стоек: гриф ровно над крюками.',d:.7,s:()=>0,F:f=>stepFoot(cp({L:F0.L,R:F1.R}),'R',F0.R,f)},
+    {n:'На крюки',c:'Чуть присел — гриф лёг на крюки. Только потом отпускаешь хват.',d:.9,s:f=>.13*ease(f),F:()=>F0,rack:true}
+  ];
+}
+let phases=buildPhases();
+const total=()=>phases.reduce((a,p)=>a+p.d,0);
+function stateAt(tc){
+  let t=tc*total(),acc=0;
+  for(let i=0;i<phases.length;i++){const p=phases[i];
+    if(t<=acc+p.d||i===phases.length-1){const f=Math.min(1,(t-acc)/p.d);return{s:p.s(f),F:p.F(f),i,rack:!!p.rack};}
+    acc+=p.d;}
+}
+const v=(x,y,z)=>({x,y,z});const add=(a,b)=>v(a.x+b.x,a.y+b.y,a.z+b.z);const sub=(a,b)=>v(a.x-b.x,a.y-b.y,a.z-b.z);
+const mul=(a,k)=>v(a.x*k,a.y*k,a.z*k);const dot=(a,b)=>a.x*b.x+a.y*b.y+a.z*b.z;const len=a=>Math.sqrt(dot(a,a));const nrm=a=>mul(a,1/len(a));
+function knee(A,H,toeDir){
+  const d=Math.min(len(sub(H,A)),L.shin+L.thigh-1e-4),e=nrm(sub(H,A));
+  const a=(L.shin*L.shin-L.thigh*L.thigh+d*d)/(2*d);const r=Math.sqrt(Math.max(0,L.shin*L.shin-a*a));
+  let u=sub(toeDir,mul(e,dot(toeDir,e)));u=nrm(u);
+  return add(add(A,mul(e,a)),mul(u,r));
+}
+let hookY=null;
+function pose(s,F){
+  F=F||W();
+  const zc=(F.L.z+F.R.z)/2;
+  let yTop=9;
+  for(const k of ['L','R']){const f=F[k],lat=Math.abs(f.x)-L.hipW,dz=f.z-zc;
+    yTop=Math.min(yTop,f.lift+Math.sqrt(Math.max(.01,Math.pow(L.shin+L.thigh,2)*0.992-lat*lat-dz*dz)));}
+  const lat=L.ankle-L.hipW, yRef=Math.sqrt(Math.pow(L.shin+L.thigh,2)*0.992-lat*lat);
+  const wide=Math.abs(F.L.x)>L.ankle*.9&&Math.abs(F.R.x)>L.ankle*.9;
+  const yBot=L.yBot, zBot=L.zBot;
+  const base=Math.min(yTop,wide?yRef:yTop);
+  const hy=base+(yBot-yRef)*s*(wide?1:1.0), hz=zc+zBot*Math.pow(s,.85)*(wide?1:.4);
+  const P={F,zc};
+  P.hipC=v(0,hy,hz);
+  for(const sd of [-1,1]){
+    const key=sd<0?'L':'R', f=F[key];
+    const A=v(f.x,f.lift,f.z);
+    const H=v(sd*L.hipW,hy,hz);
+    const toe=v(sd*Math.sin(f.toe),0,Math.cos(f.toe));
+    const K=knee(A,H,toe);
+    P['a'+key]=A;P['h'+key]=H;P['k'+key]=K;
+    P['t'+key]=add(A,mul(toe,L.foot*.78));P['he'+key]=add(A,mul(toe,-L.foot*.22));
+  }
+  let al=0;
+  for(let it=0;it<30;it++){
+    const barZ=hz+L.torso*Math.sin(al)-.05*Math.cos(al);
+    al+= (zc+mid-barZ)*1.2; al=Math.max(0,Math.min(1.1,al));
+  }
+  const tv=v(0,Math.cos(al),Math.sin(al)), back=v(0,Math.sin(al),-Math.cos(al));
+  const S=add(P.hipC,mul(tv,L.torso));
+  P.sh=S;P.alpha=al;
+  P.bar=add(add(S,mul(back,.05)),mul(tv,.015));
+  P.shL=add(S,v(-L.shW,0,0));P.shR=add(S,v(L.shW,0,0));
+  P.neck=add(S,mul(tv,L.neck));
+  const headDir=nrm(add(tv,v(0,0,.15)));
+  P.head=add(P.neck,mul(headDir,L.head));
+  for(const sd of [-1,1]){const key=sd<0?'L':'R';
+    const hand=add(P.bar,v(sd*.30,0,0));
+    P['hand'+key]=hand;P['el'+key]=add(hand,add(mul(tv,-.20),mul(back,.14)));}
+  return P;
+}
+function calibrate(){ // высота крюков: на 4 см ниже грифа, когда стоишь под ним прямо
+  hookY=pose(0,F0).bar.y-.04;
+}
+function proj(p,psi){return{x:p.x*Math.cos(psi)+p.z*Math.sin(psi),y:p.y,d:-p.x*Math.sin(psi)+p.z*Math.cos(psi)};}
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const views=[{c:document.getElementById('c1'),psi:Math.PI/2,side:true},{c:document.getElementById('c2'),psi:0},{c:document.getElementById('c3'),psi:-Math.PI/4}];
+function draw(P,s,rack){
+  const col={rack:css('--rack'),body:css('--body'),far:css('--far'),bar:css('--bar'),plate:css('--plate'),guide:css('--guide'),warn:css('--warn'),line:css('--line'),muted:css('--muted'),accent:css('--accent')};
+  for(const V of views){
+    const c=V.c,dpr=window.devicePixelRatio||1,w=c.clientWidth,h=c.clientHeight;
+    if(c.width!==Math.round(w*dpr)){c.width=Math.round(w*dpr);c.height=Math.round(h*dpr);}
+    const g=c.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,w,h);
+    const sc=Math.min(h/2.15,w/2.3),ox=V.side?w*.42:w/2,oy=h*.93;
+    const T=p=>{const q=proj(p,V.psi);return[ox+q.x*sc,oy-q.y*sc,q.d];};
+    // пол
+    g.strokeStyle=col.line;g.lineWidth=2;g.beginPath();g.moveTo(8,oy+2);g.lineTo(w-8,oy+2);g.stroke();
+    // направляющие
+    g.setLineDash([6,6]);g.lineWidth=1.5;
+    if(V.side||V.psi<0){const m=T(v(0,0,P.zc+mid)),m2=T(v(0,1.9,P.zc+mid));g.strokeStyle=col.guide;g.beginPath();g.moveTo(m[0],oy);g.lineTo(m2[0],m2[1]);g.stroke();}
+    const ky=Math.max(P.kL.y,P.kR.y)+.035;
+    if(s>.2){g.strokeStyle=col.warn;g.beginPath();g.moveTo(10,oy-ky*sc);g.lineTo(w-10,oy-ky*sc);g.stroke();}
+    g.setLineDash([]);
+    // сегменты
+    const segs=[];
+    const S=(a,b,wd)=>segs.push({a,b,wd});
+    for(const k of ['L','R']){S(P['he'+k],P['t'+k],7);S(P['a'+k],P['k'+k],9);S(P['k'+k],P['h'+k],11);S(P['sh'+k],P['el'+k],7);S(P['el'+k],P['hand'+k],6);}
+    S(P.hL,P.hR,10);S(P.hipC,P.sh,14);S(P.shL,P.shR,9);S(P.sh,P.neck,7);
+    const items=segs.map(sg=>{const A=T(sg.a),B=T(sg.b);return{A,B,wd:sg.wd,d:(A[2]+B[2])/2,type:'seg'};});
+    // стойки
+    for(const sd of [-1,1]){const x=sd*.6,z=RACK_Z+.07;
+      items.push({A:T(v(x,0,z)),B:T(v(x,1.78,z)),wd:9,d:T(v(x,.9,z))[2],type:'rack'});
+      items.push({A:T(v(x,0,z-.25)),B:T(v(x,0,z+.30)),wd:9,d:T(v(x,0,z))[2],type:'rack'});
+      items.push({A:T(v(x,hookY,z)),B:T(v(x,hookY,RACK_Z-.035)),wd:7,d:T(v(x,hookY,z))[2]+.01,type:'rack'});
+      items.push({A:T(v(x,hookY,RACK_Z-.035)),B:T(v(x,hookY+.05,RACK_Z-.035)),wd:6,d:T(v(x,hookY,z))[2]+.01,type:'rack'});}
+    // гриф и блины
+    if(rack&&P.bar.y<hookY+.032){P.bar={...P.bar,y:hookY+.032};}
+    const bl=v(-.9,P.bar.y,P.bar.z),br=v(.9,P.bar.y,P.bar.z);
+    items.push({A:T(bl),B:T(br),wd:4,d:T(P.bar)[2]+.2,type:'bar'});
+    for(const sd of [-1,1]){const pts=[];for(let i=0;i<28;i++){const a=i/28*2*Math.PI;pts.push(T(v(sd*.78,P.bar.y+.225*Math.cos(a),P.bar.z+.225*Math.sin(a))));}
+      items.push({pts,d:T(v(sd*.78,P.bar.y,P.bar.z))[2],type:'plate'});}
+    items.push({C:T(P.head),d:T(P.head)[2],type:'head'});
+    const dmin=Math.min(...items.map(i=>i.d)),dmax=Math.max(...items.map(i=>i.d));
+    items.sort((a,b)=>a.d-b.d);
+    for(const it of items){
+      const farness=dmax-dmin>0.05?(dmax-it.d)/(dmax-dmin):0;
+      if(it.type==='plate'){g.strokeStyle=col.plate;g.fillStyle=col.plate;g.lineWidth=Math.max(3,6*sc/95);g.globalAlpha=.18;g.beginPath();it.pts.forEach((p,i)=>i?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]));g.closePath();g.fill();g.globalAlpha=.9;g.stroke();g.globalAlpha=1;continue;}
+      if(it.type==='head'){g.fillStyle=col.body;g.beginPath();g.arc(it.C[0],it.C[1],.085*sc,0,7);g.fill();continue;}
+      g.strokeStyle=it.type==='bar'?col.bar:it.type==='rack'?col.rack:(farness>.55?col.far:col.body);g.lineWidth=it.wd*sc/95;g.lineCap='round';
+      g.beginPath();g.moveTo(it.A[0],it.A[1]);g.lineTo(it.B[0],it.B[1]);g.stroke();
+    }
+    // суставы
+    for(const k of ['L','R']) for(const j of ['k','h']){const p=T(P[j+k]);g.fillStyle=col.accent;g.beginPath();g.arc(p[0],p[1],3.2*sc/95,0,7);g.fill();}
+  }
+}
+const $=id=>document.getElementById(id);
+let playing=true,tc=0,last=performance.now();
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+if(reduce){playing=false;tc=.45;}
+function frame(now){
+  const dt=(now-last)/1000;last=now;
+  if(playing){tc=(tc+dt*parseFloat($('speed').value)/total())%1;$('scrub').value=tc;}
+  const st=stateAt(tc);const s=st.s,i=st.i;const P=pose(s,st.F);draw(P,s,st.rack);
+  $('pname').textContent=phases[i].n;$('pcue').textContent=phases[i].c;
+  const crease=(P.hL.y+P.hR.y)/2-.03, kneeTop=Math.max(P.kL.y,P.kR.y)+.035;
+  const dd=(kneeTop-crease)*100;
+  const dEl=$('r-depth');
+  if(s<.2){dEl.textContent='стоя';dEl.className='';}
+  else{dEl.textContent=(dd>=0?'ниже параллели на '+dd.toFixed(0)+' см':'до параллели '+(-dd).toFixed(0)+' см');dEl.className=dd>=0?'ok':'no';}
+  $('r-torso').textContent=Math.round(P.alpha*180/Math.PI)+'°';
+  const A=P.aR,K=P.kR;
+  const kz=K.z-A.z;$('r-shin').textContent=Math.round(Math.atan2(kz,K.y-A.y)*180/Math.PI)+'° вперёд';
+  $('r-bar').textContent=Math.abs((P.bar.z-P.zc-mid)*100).toFixed(1)+' см';
+  requestAnimationFrame(frame);
+}
+document.querySelectorAll('input[name=prof]').forEach(r=>r.addEventListener('change',e=>{L=PROFILES[e.target.value];if(L.yBot==null)solveBottom();phases=buildPhases();calibrate();}));
+solveBottom();phases=buildPhases();calibrate();
+$('play').addEventListener('click',()=>{playing=!playing;$('play').textContent=playing?'Пауза':'Играть';last=performance.now();});
+$('scrub').addEventListener('input',e=>{playing=false;$('play').textContent='Играть';tc=parseFloat(e.target.value);});
+if(reduce)$('play').textContent='Играть';
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

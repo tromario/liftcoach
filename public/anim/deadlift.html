@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Тяга: классика и сумо — LiftCoach</title>
+<style>
+/* Layout: заголовок и переключатель стиля, три проекции одной 3D-модели, панель управления, фаза с замерами, карточки подсказок */
+:root{
+  --bg:#f3f4f1; --panel:#ffffff; --fg:#1d2420; --muted:#66706a; --line:#d5d9d3;
+  --body:#2b3a33; --far:#9aa69f; --bar:#2a2f2c; --plate:#2f6fb3; --accent:#1f7a5a; --warn:#c77d12; --guide:#3a6fd8;
+  --ff-d:-apple-system,"Arial Narrow",Arial,sans-serif; --ff-m:ui-monospace,Menlo,monospace;
+}
+:root[data-theme="dark"]{
+  --bg:#000; --panel:#141414; --fg:#f2f2f2; --muted:#9a9a9a; --line:#2a2a2a;
+  --body:#d9e4dd; --far:#5d6b64; --bar:#c9d1cc; --plate:#5b97dc; --accent:#ff5a36; --warn:#e9a640; --guide:#6f9bff; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--ff-d);font-size:16px}
+.wrap{max-width:1180px;margin:0 auto;padding-top:calc(env(safe-area-inset-top,0px) + 12px);padding-bottom:calc(env(safe-area-inset-bottom,0px) + 40px);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:18px}
+.back{display:inline-block;color:var(--accent);text-decoration:none;font-weight:600;font-size:17px;padding:6px 0}
+h1{font-size:clamp(26px,4vw,38px);margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:4px 0 0;max-width:72ch;line-height:1.45}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel);justify-self:start}
+.seg button{font:600 16px var(--ff-d);background:transparent;color:var(--fg);border:0;padding:9px 18px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+.views{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:760px){.views{grid-template-columns:1fr}}
+.view{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;min-width:0;display:grid;gap:6px}
+.view h2{margin:0;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+canvas{width:100%;aspect-ratio:4/5;display:block;max-width:100%}
+.ctrl{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+#play{font:600 15px var(--ff-d);background:var(--accent);color:#fff;border:0;border-radius:8px;padding:8px 16px;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--guide);outline-offset:2px}
+label{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:14px}
+input[type=range]{width:160px;accent-color:var(--accent)}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted)}
+.sw{display:inline-block;width:18px;height:3px;vertical-align:middle;margin-right:6px;border-radius:2px}
+.phase{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;align-items:baseline}
+.phase .name{font-weight:700;font-size:20px;color:var(--accent)}
+.phase .cue{font-size:17px;line-height:1.4}
+.readout{font-family:var(--ff-m);font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px 18px;font-variant-numeric:tabular-nums}
+.readout b{color:var(--fg);font-weight:600}
+.cues{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.cue-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
+.cue-card h3{margin:0 0 6px;font-size:16px}
+.cue-card ul{margin:0;padding-left:18px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="../">← LiftCoach</a>
+  <header style="display:grid;gap:10px">
+    <h1>Тяга: классика и сумо</h1>
+    <p class="sub">Модель под твои пропорции (рост 178 см, бедро ≈ голень, длинный корпус). Гриф идёт строго вертикально над серединой стопы; положение таза и плеч рассчитано так, чтобы руки оставались прямыми, а голени касались грифа.</p>
+    <div class="seg" role="group" aria-label="Стиль тяги">
+      <button id="m-conv" type="button" aria-pressed="true">Классика</button>
+      <button id="m-sumo" type="button" aria-pressed="false">Сумо</button>
+    </div>
+  </header>
+
+  <div class="views">
+    <div class="view"><h2>Сбоку</h2><canvas id="c1" aria-label="Вид сбоку"></canvas></div>
+    <div class="view"><h2>Спереди</h2><canvas id="c2" aria-label="Вид спереди"></canvas></div>
+    <div class="view"><h2>45° спереди-сбоку</h2><canvas id="c3" aria-label="Вид 45 градусов"></canvas></div>
+  </div>
+
+  <div class="ctrl">
+    <button id="play" type="button">Пауза</button>
+    <label for="speed">Скорость <input id="speed" type="range" min="0.25" max="1.5" step="0.05" value="0.6"></label>
+    <label for="dyn"><input id="dyn" type="checkbox"> Динамический старт</label>
+    <label for="scrub">Кадр <input id="scrub" type="range" min="0" max="1" step="0.001" value="0"></label>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--guide)"></i>середина стопы / путь грифа</span>
+      <span><i class="sw" style="background:var(--warn)"></i>высота таза в момент отрыва</span>
+      <span><i class="sw" style="background:var(--far)"></i>дальняя сторона</span>
+    </div>
+  </div>
+
+  <div class="view">
+    <div class="phase"><span class="name" id="pname">Постановка</span><span class="cue" id="pcue"></span></div>
+    <div class="readout">
+      <span>угол спины к полу: <b id="r-back">—</b></span>
+      <span>плечи vs гриф: <b id="r-sh">—</b></span>
+      <span>гриф от пола: <b id="r-bar">—</b></span>
+      <span>таз выше старта: <b id="r-hip">—</b></span>
+    </div>
+  </div>
+
+  <div class="cues" id="cards"></div>
+</div>
+
+<script>
+(function(){
+const BASE={shin:.44,thigh:.43,torso:.555,neck:.10,head:.11,hipW:.10,shW:.18,arm:.63,foot:.26,plateR:.225};
+const MODES={
+  conv:{name:'Классика',ankle:.15,toe:10*Math.PI/180,grip:.25,shAhead:.035,shinGap:.03,
+    cards:[['Постановка',['Стопы на ширине таза, носки чуть наружу.','Гриф над серединой стопы: ~2–3 см от голени.','Хват сразу снаружи голеней, руки вертикальны.']],
+           ['Старт',['Голени к грифу, грудь вверх — таз встаёт сам.','Плечи чуть впереди грифа, лопатки над ним.','Выбрать слабину: гриф «щёлкнул» о блины.']],
+           ['Отрыв до колен',['Отталкиваешь пол ногами, угол спины не меняется.','Таз и плечи поднимаются вместе с грифом.','Гриф скользит по голеням, тянешь его к себе.']],
+           ['Дожим',['После колен — таз вперёд к грифу.','Встать вертикально: ягодицы сжаты, рёбра вниз.','Без отклонения назад.']]],
+    phases:{set:'Стопы на ширине таза, гриф над серединой стопы. Голени к грифу, грудь вверх.',slack:'Выбираешь слабину: гриф к голеням и вверх, пока не «щёлкнет». Широчайшие напряжены.',
+      floor:'Отталкиваешь пол ногами. Таз и плечи поднимаются вместе, угол спины почти не меняется.',lock:'После колен таз идёт вперёд к грифу. Колени и таз выпрямляются одновременно.',
+      top:'Стоишь вертикально: ягодицы сжаты, рёбра опущены, плечи не за тазом.',down:'Опускаешь тем же путём: сначала таз назад, после колен — сгибаешь колени.'}},
+  sumo:{name:'Сумо',ankle:.36,toe:42*Math.PI/180,grip:.16,shAhead:.045,shinGap:.03,
+    cards:[['Постановка',['Стопы широко, носки наружу на 40–45°.','Голени почти вертикальны, гриф над серединой стопы.','Хват внутри коленей, руки вертикальны.']],
+           ['Старт',['Колени наружу, над носками.','Таз подтягиваешь к грифу — вперёд, а не вниз.','Плечи над грифом, корпус вертикальнее, чем в классике.']],
+           ['Отрыв',['«Раздвинуть пол» стопами наружу.','Таз не стреляет вверх: грудь и таз поднимаются вместе.','Отрыв медленнее, чем в классике, — это нормально.']],
+           ['Дожим',['Таз вперёд, колени выпрямляются вместе с ним.','Локаут вертикальный, без отклонения назад.','Ягодицы сжаты, рёбра вниз.']]],
+    phases:{set:'Стопы широко, носки наружу. Гриф над серединой стопы, голени почти вертикальны.',slack:'Тянешь себя к грифу: таз вперёд, колени наружу, слабина выбрана.',
+      floor:'Раздвигаешь пол стопами. Таз и грудь поднимаются вместе, корпус почти не наклоняется.',lock:'Таз вперёд к грифу, колени выпрямляются одновременно с тазом.',
+      top:'Стоишь вертикально, без отклонения назад. Ягодицы сжаты.',down:'Опускаешь тем же путём: таз назад и вниз, колени наружу.'}}
+};
+let mode='conv',M=MODES.conv,L={...BASE,...M};
+const mid=.06;
+const v=(x,y,z)=>({x,y,z});const add=(a,b)=>v(a.x+b.x,a.y+b.y,a.z+b.z);const sub=(a,b)=>v(a.x-b.x,a.y-b.y,a.z-b.z);
+const mul=(a,k)=>v(a.x*k,a.y*k,a.z*k);const dot=(a,b)=>a.x*b.x+a.y*b.y+a.z*b.z;const len=a=>Math.sqrt(dot(a,a));const nrm=a=>mul(a,1/len(a));
+const ease=x=>x<.5?2*x*x:1-Math.pow(-2*x+2,2)/2;const sstep=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t);};
+const lerp=(a,b,f)=>a+(b-a)*f;
+function knee(A,H,toe){
+  const dd=len(sub(H,A)),d=Math.min(dd,L.shin+L.thigh-1e-4),e=nrm(sub(H,A));
+  const a=(L.shin*L.shin-L.thigh*L.thigh+d*d)/(2*d);const r=Math.sqrt(Math.max(0,L.shin*L.shin-a*a));
+  let u=sub(toe,mul(e,dot(toe,e)));u=nrm(u);return add(add(A,mul(e,a)),mul(u,r));
+}
+// плечо: на расстоянии корпуса от таза и на длине руки от грифа (в сагиттальной плоскости), выбираем точку выше
+function shoulder(hy,hz,by,bz){
+  const dx=L.grip-L.shW, la=Math.sqrt(L.arm*L.arm-dx*dx), lt=L.torso;
+  const px=hz,py=hy,qx=bz,qy=by;const d=Math.hypot(qx-px,qy-py);
+  if(d>la+lt||d<Math.abs(la-lt))return null;
+  const a=(lt*lt-la*la+d*d)/(2*d),h=Math.sqrt(Math.max(0,lt*lt-a*a));
+  const ex=(qx-px)/d,ey=(qy-py)/d,mx=px+ex*a,my=py+ey*a;
+  const s1={z:mx-ey*h,y:my+ex*h},s2={z:mx+ey*h,y:my-ex*h};
+  return s1.y>s2.y?s1:s2;
+}
+function legs(hy,hz){
+  const P={};
+  for(const sd of [-1,1]){const k=sd<0?'L':'R';
+    const A=v(sd*L.ankle,0,0),H=v(sd*L.hipW,hy,hz),toe=v(sd*Math.sin(L.toe),0,Math.cos(L.toe));
+    P['a'+k]=A;P['h'+k]=H;P['k'+k]=knee(A,H,toe);P['t'+k]=add(A,mul(toe,L.foot*.78));P['he'+k]=add(A,mul(toe,-L.foot*.22));}
+  return P;
+}
+let SET=null,LOCK=null;
+function solveSetup(){
+  const by=L.plateR,bz=mid;let best=null;
+  for(let hy=.35;hy<=.85;hy+=.004)for(let hz=-.40;hz<=.05;hz+=.004){
+    const S=shoulder(hy,hz,by,bz);if(!S)continue;
+    const P=legs(hy,hz);if(len(sub(P.hR,P.aR))>L.shin+L.thigh-.002)continue;
+    // точка голени на высоте грифа
+    const A=P.aR,K=P.kR,f=by/K.y;const shinZ=A.z+(K.z-A.z)*f;
+    const c1=S.z-(bz+L.shAhead),c2=shinZ-(bz-L.shinGap);const cost=c1*c1+c2*c2;
+    if(!best||cost<best.cost)best={cost,hy,hz};}
+  SET=best;
+  const hy1=Math.sqrt(Math.pow(L.shin+L.thigh,2)*.997-Math.pow(L.ankle-L.hipW,2));
+  const hz1=mid-.11; const S1y=hy1+L.torso; const dx=L.grip-L.shW, la=Math.sqrt(L.arm*L.arm-dx*dx);
+  LOCK={hy:hy1,hz:hz1,by:S1y-Math.sqrt(la*la-Math.pow(mid-hz1,2))};
+}
+function pose(s,pre){
+  pre=pre||0;
+  const by=lerp(L.plateR,LOCK.by,s);
+  const fy=Math.pow(s,.9), fz=sstep(.30,1,s);
+  const hy=lerp(SET.hy,LOCK.hy,fy)+pre*.15, hz=lerp(SET.hz,LOCK.hz,fz)-pre*.03;
+  const P=legs(hy,hz);P.hipC=v(0,hy,hz);
+  let S=shoulder(hy,hz,by,mid)||{y:hy+L.torso,z:hz};
+  P.sh=v(0,S.y,S.z);P.bar=v(0,by,mid);
+  P.shL=add(P.sh,v(-L.shW,0,0));P.shR=add(P.sh,v(L.shW,0,0));
+  const tv=nrm(sub(P.sh,P.hipC));P.neck=add(P.sh,mul(tv,L.neck));
+  P.head=add(P.neck,mul(nrm(add(tv,v(0,.2,.35))),L.head));
+  for(const sd of [-1,1]){const k=sd<0?'L':'R';const hand=v(sd*L.grip,by,mid);P['hand'+k]=hand;
+    P['el'+k]=add(P['sh'+k],mul(sub(hand,P['sh'+k]),.48));}
+  P.back=Math.atan2(S.y-hy,S.z-hz)*180/Math.PI; P.s=s;
+  return P;
+}
+let dyn=false;
+const DYN={conv:'Встаёшь к грифу с высоко поднятым тазом, руки прямые, гриф в руках.',sumo:'Взялся за гриф, таз высоко, колени уже разведены.'};
+const PH=()=>[
+  ...(dyn?[
+  {n:'Постановка сверху',c:DYN[mode],d:1.0,s:()=>0,pre:()=>1},
+  {n:'Нырок',c:'Один короткий нырок тазом вниз. Опускаясь, тянешь гриф к себе — слабина выбрана. Таз доходит ровно до оранжевой линии.',d:.38,s:()=>0,pre:f=>1-f*f},
+  ]:[
+  {n:'Постановка',c:M.phases.set,d:1.1,s:()=>0},
+  {n:'Слабина',c:M.phases.slack,d:.6,s:()=>0}]),
+  {n:'Отрыв до колен',c:(dyn?'Без паузы внизу: нижняя точка нырка и есть отрыв. ':'')+M.phases.floor,d:1.0,s:f=>.42*ease(f)},
+  {n:'Дожим',c:M.phases.lock,d:.9,s:f=>lerp(.42,1,ease(f))},
+  {n:'Локаут',c:M.phases.top,d:.9,s:()=>1},
+  {n:'Опускание',c:M.phases.down,d:1.5,s:f=>1-ease(f)}
+];
+let phases=PH();const total=()=>phases.reduce((a,p)=>a+p.d,0);
+function stateAt(tc){let t=tc*total(),acc=0;for(let i=0;i<phases.length;i++){const p=phases[i];
+  if(t<=acc+p.d||i===phases.length-1){const f=Math.min(1,(t-acc)/p.d);return{s:p.s(f),pre:p.pre?p.pre(f):0,i};}acc+=p.d;}}
+function proj(p,psi){return{x:p.x*Math.cos(psi)+p.z*Math.sin(psi),y:p.y,d:-p.x*Math.sin(psi)+p.z*Math.cos(psi)};}
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const views=[{c:document.getElementById('c1'),psi:Math.PI/2,side:true},{c:document.getElementById('c2'),psi:0},{c:document.getElementById('c3'),psi:-Math.PI/4}];
+let setHip=0;
+function draw(P){
+  const col={body:css('--body'),far:css('--far'),bar:css('--bar'),plate:css('--plate'),guide:css('--guide'),warn:css('--warn'),line:css('--line'),accent:css('--accent')};
+  for(const V of views){
+    const c=V.c,dpr=window.devicePixelRatio||1,w=c.clientWidth,h=c.clientHeight;
+    if(c.width!==Math.round(w*dpr)){c.width=Math.round(w*dpr);c.height=Math.round(h*dpr);}
+    const g=c.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,w,h);
+    const sc=Math.min(h/2.0,w/2.1),ox=w/2,oy=h*.93;
+    const T=p=>{const q=proj(p,V.psi);return[ox+q.x*sc,oy-q.y*sc,q.d];};
+    g.strokeStyle=col.line;g.lineWidth=2;g.beginPath();g.moveTo(8,oy+2);g.lineTo(w-8,oy+2);g.stroke();
+    g.setLineDash([6,6]);g.lineWidth=1.5;
+    if(V.side||V.psi<0){const m=T(v(0,0,mid)),m2=T(v(0,1.95,mid));g.strokeStyle=col.guide;g.beginPath();g.moveTo(m[0],oy);g.lineTo(m2[0],m2[1]);g.stroke();}
+    g.strokeStyle=col.warn;g.beginPath();g.moveTo(10,oy-setHip*sc);g.lineTo(w-10,oy-setHip*sc);g.stroke();g.setLineDash([]);
+    const items=[];const S=(a,b,wd)=>{const A=T(a),B=T(b);items.push({A,B,wd,d:(A[2]+B[2])/2,type:'seg'});};
+    for(const k of ['L','R']){S(P['he'+k],P['t'+k],7);S(P['a'+k],P['k'+k],9);S(P['k'+k],P['h'+k],11);S(P['sh'+k],P['el'+k],7);S(P['el'+k],P['hand'+k],6);}
+    S(P.hL,P.hR,10);S(P.hipC,P.sh,14);S(P.shL,P.shR,9);S(P.sh,P.neck,7);
+    items.push({A:T(v(-.95,P.bar.y,mid)),B:T(v(.95,P.bar.y,mid)),wd:4,d:T(P.bar)[2]+.25,type:'bar'});
+    for(const sd of [-1,1])for(const off of [0,.04]){const x=sd*(.72+off);const pts=[];for(let i=0;i<30;i++){const a=i/30*2*Math.PI;pts.push(T(v(x,P.bar.y+L.plateR*Math.cos(a),mid+L.plateR*Math.sin(a))));}
+      items.push({pts,d:T(v(x,P.bar.y,mid))[2],type:'plate'});}
+    items.push({C:T(P.head),d:T(P.head)[2],type:'head'});
+    const ds=items.map(i=>i.d),dmin=Math.min(...ds),dmax=Math.max(...ds);items.sort((a,b)=>a.d-b.d);
+    for(const it of items){const far=dmax-dmin>.05?(dmax-it.d)/(dmax-dmin):0;
+      if(it.type==='plate'){g.strokeStyle=col.plate;g.fillStyle=col.plate;g.lineWidth=Math.max(3,5*sc/95);g.globalAlpha=.14;g.beginPath();it.pts.forEach((p,i)=>i?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]));g.closePath();g.fill();g.globalAlpha=.85;g.stroke();g.globalAlpha=1;continue;}
+      if(it.type==='head'){g.fillStyle=col.body;g.beginPath();g.arc(it.C[0],it.C[1],.085*sc,0,7);g.fill();continue;}
+      g.strokeStyle=it.type==='bar'?col.bar:(far>.55?col.far:col.body);g.lineWidth=it.wd*sc/95;g.lineCap='round';g.beginPath();g.moveTo(it.A[0],it.A[1]);g.lineTo(it.B[0],it.B[1]);g.stroke();}
+    for(const k of ['L','R'])for(const j of ['k','h']){const p=T(P[j+k]);g.fillStyle=col.accent;g.beginPath();g.arc(p[0],p[1],3.2*sc/95,0,7);g.fill();}
+  }
+}
+function cards(){document.getElementById('cards').innerHTML=M.cards.map(([h,li])=>`<div class="cue-card"><h3>${h}</h3><ul>${li.map(x=>`<li>${x}</li>`).join('')}</ul></div>`).join('');}
+function setMode(m){mode=m;M=MODES[m];L={...BASE,...M};solveSetup();phases=PH();setHip=SET.hy;cards();
+  document.getElementById('m-conv').setAttribute('aria-pressed',m==='conv');document.getElementById('m-sumo').setAttribute('aria-pressed',m==='sumo');}
+const $=id=>document.getElementById(id);
+let playing=true,tc=0,last=performance.now();
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;if(reduce){playing=false;tc=.3;$('play').textContent='Играть';}
+function frame(now){const dt=(now-last)/1000;last=now;
+  if(playing){tc=(tc+dt*parseFloat($('speed').value)/total())%1;$('scrub').value=tc;}
+  const st=stateAt(tc);const P=pose(st.s,st.pre);draw(P);
+  $('pname').textContent=phases[st.i].n;$('pcue').textContent=phases[st.i].c;
+  $('r-back').textContent=Math.round(P.back)+'°';
+  const d=(P.sh.z-mid)*100;$('r-sh').textContent=(d>=0?'впереди на ':'позади на ')+Math.abs(d).toFixed(1)+' см';
+  $('r-bar').textContent=Math.round(P.bar.y*100)+' см';
+  {const dh=Math.round((P.hipC.y-SET.hy)*100);$('r-hip').textContent=(st.pre>0?'выше линии отрыва на '+dh+' см':Math.max(0,dh)+' см');}
+  requestAnimationFrame(frame);}
+$('dyn').addEventListener('change',e=>{dyn=e.target.checked;phases=PH();tc=0;});
+$('m-conv').addEventListener('click',()=>setMode('conv'));$('m-sumo').addEventListener('click',()=>setMode('sumo'));
+$('play').addEventListener('click',()=>{playing=!playing;$('play').textContent=playing?'Пауза':'Играть';last=performance.now();});
+$('scrub').addEventListener('input',e=>{playing=false;$('play').textContent='Играть';tc=parseFloat(e.target.value);});
+setMode('conv');requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
