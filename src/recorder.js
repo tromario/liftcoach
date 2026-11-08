@@ -25,10 +25,13 @@ async function getMic() {
   } catch (e) { console.warn("mic", e); return null; }
 }
 
+let starting = false;
 export async function startRecording(meta, { audio = false } = {}) {
-  if (rec || !window.MediaRecorder || !video.srcObject) return false;
+  if (rec || starting || !window.MediaRecorder || !video.srcObject) return false;
+  starting = true;
   const mime = pickMime();
   const mic = audio ? await getMic() : null;
+  starting = false;
   const tracks = [...video.srcObject.getVideoTracks(), ...(mic ? [mic] : [])];
   const src = new MediaStream(tracks);
   const opts = { videoBitsPerSecond: BITRATE[quality] || BITRATE["720"], ...(mic ? { audioBitsPerSecond: 128_000 } : {}) };
