@@ -92,6 +92,16 @@
 <div id="start" class="screen">
   <h1>LiftCoach</h1>
   <p class="mut">Тренер по технике: присед, жим, тяга</p>
+  <div class="row" style="width:280px">
+    <button class="primary" id="goSquat">Присед</button>
+    <button class="primary" id="goBench">Жим</button>
+  </div>
+  <div class="row" style="width:280px">
+    <a class="btn" href="./anim/squat.html">Техника: присед</a>
+    <a class="btn" href="./anim/deadlift.html">Техника: тяга</a>
+  </div>
+  <button id="goLive">Живые углы</button>
+  <h3 class="settings-title">Настройки</h3>
   <label class="field">Рост, см
     <input id="height" type="number" inputmode="decimal" min="140" max="220" step="0.5">
   </label>
@@ -133,15 +143,6 @@
       <option value="en">По-английски: Squat, Start, Press, Rack</option>
     </select>
   </label>
-  <div class="row" style="width:280px">
-    <button class="primary" id="goSquat">Присед</button>
-    <button class="primary" id="goBench">Жим</button>
-  </div>
-  <div class="row" style="width:280px">
-    <a class="btn" href="./anim/squat.html">Техника: присед</a>
-    <a class="btn" href="./anim/deadlift.html">Техника: тяга</a>
-  </div>
-  <button id="goLive">Живые углы</button>
   <button id="resetProfile" class="small">Сбросить замеры пропорций</button>
   <div id="log" class="mut small"></div>
 </div>

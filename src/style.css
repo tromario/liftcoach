@@ -22,10 +22,15 @@ button.primary{background:var(--acc)}
 a.btn{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;border-radius:12px;padding:12px 8px;font-weight:600;background:#2a2a2a;color:var(--fg);text-decoration:none;font-size:14px;line-height:1.2}
 input,select{font-weight:500;width:100%}
 
-.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:calc(env(safe-area-inset-top) + 20px) 24px calc(env(safe-area-inset-bottom) + 20px);background:#000;z-index:5;text-align:center}
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:14px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:calc(env(safe-area-inset-top) + 20px) 24px calc(env(safe-area-inset-bottom) + 20px);background:#000;z-index:5;text-align:center}
+/* по центру, если влезает; прокрутка, если нет */
+.screen > :first-child{margin-top:auto}
+.screen > :last-child{margin-bottom:auto}
+.screen > *{flex-shrink:0}
 .screen h1{margin:0;font-size:28px} .screen h2{margin:0 0 4px}
 .screen p{margin:0}
 .screen > button,.field{width:280px;flex:none}
+.settings-title{width:280px;margin:14px 0 0;text-align:left;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);font-weight:600}
 .field{display:flex;flex-direction:column;gap:6px;text-align:left;color:var(--mut);font-size:13px}
 .scroll{justify-content:flex-start;overflow-y:auto;-webkit-overflow-scrolling:touch;text-align:left;align-items:stretch}
 .row{display:flex;gap:8px;margin-top:8px}
