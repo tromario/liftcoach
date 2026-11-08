@@ -91,7 +91,7 @@ function startMode() {
 /** Сначала выставляем камеру, потом — режим. Запись (если идёт) продолжается. */
 function runSetup() {
   $("squat").hidden = true; $("bench").hidden = true; clear();
-  setupStart(mode, startMode);
+  setupStart(mode, startMode, st);
   setHandler(withRec(setupFrame, () => ({ state: "setup" })));
 }
 

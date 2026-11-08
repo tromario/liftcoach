@@ -59,6 +59,9 @@ th{color:var(--mut);font-weight:500;font-size:13px}
 .su-list .dot{width:12px;height:12px;border-radius:50%;background:#555;flex:none}
 .su-list li.ok .dot{background:var(--ok)} .su-list li.bad .dot{background:var(--warn)}
 .su-list li.ok{color:#cfe}
+.su-fix{margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(255,204,0,.14);border:1px solid rgba(255,204,0,.5)}
+.su-fix-title{font-weight:700;color:var(--warn);margin-bottom:4px}
+.su-fix ul{margin:0;padding-left:18px;font-size:17px;font-weight:600;line-height:1.45}
 .su-hint{position:absolute;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 80px);text-align:center;font-size:22px;font-weight:700;text-shadow:0 2px 8px #000}
 .su-hint.ok{color:var(--ok)} .su-hint.bad{color:var(--warn)}
 
