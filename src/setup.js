@@ -4,7 +4,8 @@
 //  - рамка-подсказка поверх кадра: горизонт (высота объектива), безопасная зона, где должна быть скамья/ты;
 //  - стойки и скамью проверяешь глазами по рамке — распознавать их автоматически модель не умеет.
 // «Готово» — и в режим. Голос здесь почти молчит: ты и так смотришь на экран.
-import { canvas, video, startCamera, lens, lensNote } from "./pose.js";
+import { canvas, frame, setZoom, lens, lensNote } from "./pose.js";
+import * as pose from "./pose.js";
 import { level } from "./level.js";
 import { say } from "./voice.js";
 
@@ -35,7 +36,7 @@ const GUIDE = {
 
 function checks(mode) {
   const r = [];
-  if (mode === "bench") r.push({ label: "Телефон горизонтально", ok: video.videoWidth > video.videoHeight, hint: "Поверни телефон горизонтально" });
+  if (mode === "bench") r.push({ label: "Телефон горизонтально", ok: frame.w > frame.h, hint: "Поверни телефон горизонтально" });
   if (!level.available) r.push({ label: "Уровень (датчик недоступен)", ok: true });
   else {
     const ok = Math.abs(level.pitch) <= TOL && Math.abs(level.roll) <= TOL;
@@ -54,7 +55,7 @@ function drawGuide(mode, levelOk) {
   g.setLineDash([lw * 6, lw * 4]); g.lineWidth = lw; g.strokeStyle = "rgba(255,255,255,.75)";
   g.strokeRect(z.x0 * w, z.y0 * h, (z.x1 - z.x0) * w, (z.y1 - z.y0) * h);
   // края кадра, где широкоугольник искажает, — затемняем
-  if (lens === "ultra") { g.fillStyle = "rgba(0,0,0,.25)"; g.fillRect(0, 0, w * .06, h); g.fillRect(w * .94, 0, w * .06, h); }
+  if (lens === "ultra" && frame.crop > 0.9) { g.fillStyle = "rgba(0,0,0,.25)"; g.fillRect(0, 0, w * .06, h); g.fillRect(w * .94, 0, w * .06, h); }
   // горизонт = высота объектива (только если телефон ровно)
   if (levelOk) {
     g.setLineDash([]); g.strokeStyle = "rgba(111,155,255,.95)"; g.lineWidth = lw * 1.5;
@@ -82,17 +83,17 @@ export function setupStop() { $("setup").hidden = true; S = null; }
 export function setupDone() { if (!S) return; const cb = S.onDone; setupStop(); cb?.(); }
 
 function renderLens() {
-  document.querySelectorAll("[data-lens]").forEach(b => b.classList.toggle("on", b.dataset.lens === lens));
+  document.querySelectorAll("[data-zoom]").forEach(b => b.classList.toggle("on", Math.abs(+b.dataset.zoom - pose.zoom) < 0.01));
   $("suLensNote").textContent = lensNote;
 }
 
-export async function setLens(l) {
+export async function setLens(z) {
   if (!S) return;
   $("suLensNote").textContent = "Переключаю камеру…";
-  try { await startCamera(undefined, undefined, l); } catch (e) { $("suLensNote").textContent = "Не удалось: " + (e.message || e); return; }
-  S.settings.lens = lens;
+  try { await setZoom(z); } catch (e) { $("suLensNote").textContent = "Не удалось: " + (e.message || e); return; }
+  S.settings.zoom = pose.zoom;
   renderLens();
-  return lens;
+  return pose.zoom;
 }
 
 export function setupFrame(res, lm, ts) {

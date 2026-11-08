@@ -1,5 +1,5 @@
 import "./style.css";
-import { initPose, startCamera, startLoop, setHandler, flipCamera, clear, unlockTarget, setAutoLock, justLocked, loadedModelName } from "./pose.js";
+import { initPose, startCamera, setZoom, startLoop, setHandler, flipCamera, clear, unlockTarget, setAutoLock, justLocked, loadedModelName } from "./pose.js";
 import * as pose from "./pose.js";
 import { unlockVoice, say, quiet } from "./voice.js";
 import { unlockAudio } from "./audio.js";
@@ -53,7 +53,8 @@ async function boot() {
   const delegate = await initPose(modelFor(st.model));
   $("modelChip").textContent = (st.model === "auto" ? "авто: " : "") + modelFor(st.model) + " · " + delegate;
   log("Включаю камеру…");
-  await startCamera(undefined, st.quality, st.lens);
+  await startCamera(undefined, st.quality);
+  if (st.zoom < 0.99) await setZoom(st.zoom);
   startLoop(fps => { $("fps").textContent = fps; updateLevel(); updateRecButton(); autoModel(fps); });
   booted = true;
   log("");
@@ -76,7 +77,7 @@ async function enter(m) {
   readSettings();
   try {
     await boot();
-    if (pose.quality !== st.quality) await startCamera(pose.facing, st.quality, st.lens);   // качество поменяли в настройках
+    if (pose.quality !== st.quality && pose.lens !== "ultra") await startCamera(pose.facing, st.quality);   // качество поменяли в настройках
     if (st.model !== "auto" && loadedModelName() !== st.model) {
       const d = await initPose(st.model); $("modelChip").textContent = st.model + " · " + d;
     }
@@ -155,7 +156,7 @@ document.querySelectorAll("[data-back]").forEach(b => b.onclick = toMenu);
 document.querySelectorAll("[data-flip]").forEach(b => b.onclick = () => flipCamera());
 document.querySelectorAll("[data-rec]").forEach(b => b.onclick = toggleRec);
 document.querySelectorAll("[data-setup]").forEach(b => b.onclick = runSetup);
-document.querySelectorAll("[data-lens]").forEach(b => b.onclick = async () => { await setLens(b.dataset.lens); saveSettings(st); });
+document.querySelectorAll("[data-zoom]").forEach(b => b.onclick = async () => { await setLens(+b.dataset.zoom); saveSettings(st); });
 // карточки сворачиваются по нажатию — чтобы не закрывали кадр
 document.querySelectorAll("[data-collapse]").forEach(el => el.addEventListener("click", e => {
   if (e.target.closest("button")) return;

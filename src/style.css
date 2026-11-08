@@ -88,7 +88,7 @@ button.rec-on{background:#c62828}
 .su-tips{margin:4px 0 0;padding-left:18px;color:#ddd;font-size:14px;line-height:1.4}
 .su-list li.eye .dot{background:#6f9bff}
 .su-lens{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
-.su-lens button{flex:0 0 auto;padding:8px 14px;border-radius:10px}
+.su-lens button{flex:0 0 auto;padding:8px 10px;border-radius:10px;min-width:44px}
 .su-lens button.on{background:var(--acc)}
 /* сворачиваемые карточки: нажми — останется одна строка */
 [data-collapse]{cursor:pointer}

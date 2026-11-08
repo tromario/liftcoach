@@ -16,6 +16,7 @@
 <!-- Камера и скелет: общий слой для всех режимов -->
 <div id="stage" hidden>
   <video id="video" playsinline muted autoplay></video>
+  <canvas id="view" hidden></canvas>
   <canvas id="canvas"></canvas>
 
   <div class="hud">
@@ -51,9 +52,12 @@
       <ul id="suInstr" class="su-tips"></ul>
       <ul id="suList" class="su-list"></ul>
       <div class="su-lens">
-        <span class="mut small">Объектив</span>
-        <button data-lens="wide">1×</button>
-        <button data-lens="ultra">0.5×</button>
+        <span class="mut small">Зум</span>
+        <button data-zoom="0.5">0.5</button>
+        <button data-zoom="0.6">0.6</button>
+        <button data-zoom="0.7">0.7</button>
+        <button data-zoom="0.8">0.8</button>
+        <button data-zoom="1">1×</button>
         <span id="suLensNote" class="mut small"></span>
       </div>
     </div>

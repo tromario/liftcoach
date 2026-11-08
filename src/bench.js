@@ -3,7 +3,7 @@
 // Команды судьи (Старт/Жим/Стойка) — дополнительная опция в меню.
 // Гриф ≈ запястье видимой стороны. Высота грифа считается над плечевым суставом.
 import { CFG } from "./config.js";
-import { px, drawSkeleton, video } from "./pose.js";
+import { px, drawSkeleton, video, frame } from "./pose.js";
 import { angle, sideIdx, nearSide, median, dist } from "./geom.js";
 import { levelHint } from "./level.js";
 import { say } from "./voice.js";
@@ -53,7 +53,7 @@ function framing(lm) {
   const sh = px(lm, s.sh), hip = px(lm, s.hip);
   const tilt = Math.abs(Math.atan2(hip.y - sh.y, Math.abs(hip.x - sh.x))) * 180 / Math.PI;
   if (tilt > 35) return { ok: false, hint: "Камера должна смотреть сбоку на скамью", side };
-  const torsoFrac = dist(sh, hip) / video.videoWidth;
+  const torsoFrac = dist(sh, hip) / frame.w;
   if (torsoFrac < B.torsoMin) return { ok: false, hint: "Поставь камеру ближе", side };
   if (torsoFrac > B.torsoMax) return { ok: false, hint: "Отодвинь камеру", side };
   return { ok: true, side };

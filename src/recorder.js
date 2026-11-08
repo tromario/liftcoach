@@ -2,7 +2,7 @@
 // Видео — тренеру и для разбора; данные — для разбора (скелет по ним восстанавливается).
 // Ограничения по длительности нет. Всё копится в памяти телефона.
 // 720p — 5 Мбит/с (~37 МБ/мин), 1080p — 10 Мбит/с (~75 МБ/мин). Звук — по настройке.
-import { video, facing, quality, drawSkeleton } from "./pose.js";
+import { video, facing, quality, drawSkeleton, frame, drawFrame } from "./pose.js";
 
 const BITRATE = { "720": 5_000_000, "1080": 10_000_000 };
 let rec = null;
@@ -33,12 +33,14 @@ export async function startRecording(meta, { audio = false, skeleton = false } =
   const mic = audio ? await getMic() : null;
   starting = false;
   // Скелет на видео: пишем не камеру, а холст, на котором рисуем кадр + скелет
+  // при зуме 0.6–0.8× тоже пишем с холста — с обрезанным кадром
   let c = null, g = null, videoTracks = video.srcObject.getVideoTracks();
-  if (skeleton) {
-    const vw = video.videoWidth, vh = video.videoHeight, k = Math.min(1, (quality === "1080" ? 1920 : 1280) / Math.max(vw, vh));
+  const cropped = frame.crop < 0.999;
+  if (skeleton || cropped) {
+    const vw = frame.w, vh = frame.h, k = Math.min(1, (quality === "1080" ? 1920 : 1280) / Math.max(vw, vh));
     c = document.createElement("canvas"); c.width = Math.round(vw * k); c.height = Math.round(vh * k);
     g = c.getContext("2d");
-    g.drawImage(video, 0, 0, c.width, c.height);
+    drawFrame(g, c.width, c.height);
     videoTracks = c.captureStream(30).getVideoTracks();
   }
   const tracks = [...videoTracks, ...(mic ? [mic] : [])];
@@ -49,7 +51,7 @@ export async function startRecording(meta, { audio = false, skeleton = false } =
   const chunks = [];
   let bytes = 0;
   mr.ondataavailable = e => { if (e.data.size) { chunks.push(e.data); bytes += e.data.size; if (rec) rec.bytes = bytes; } };
-  rec = { mr, chunks, bytes: 0, mime: mr.mimeType || mime, t0: performance.now(), frames: [], meta, mic, audioWanted: audio, c, g };
+  rec = { mr, chunks, bytes: 0, mime: mr.mimeType || mime, t0: performance.now(), frames: [], meta, mic, audioWanted: audio, c, g, skeleton };
   rec.stopped = new Promise(res => { mr.onstop = res; });
   mr.start(1000);
   return true;
@@ -70,9 +72,12 @@ export function recordFrame(lm, ts, state) {
     const { c, g } = rec;
     g.save();
     if (facing === "user") { g.translate(c.width, 0); g.scale(-1, 1); }
-    g.drawImage(video, 0, 0, c.width, c.height);
-    if (lm) drawSkeleton(lm, { target: g, w: c.width, h: c.height, highlight: [...Array(33).keys()] });
+    drawFrame(g, c.width, c.height);
+    if (lm && rec.skeleton) drawSkeleton(lm, { target: g, w: c.width, h: c.height, highlight: [...Array(33).keys()] });
     g.restore();
+  }
+  if (rec.c && rec.skeleton) {
+    const { c, g } = rec;
     // время от начала записи и фаза — по ним видео сверяется с данными
     const label = `${((ts - rec.t0) / 1000).toFixed(1)} с${state?.state ? " · " + state.state : ""}`;
     const fs = Math.round(c.height / 32);
@@ -100,13 +105,13 @@ export async function stopRecording(extra = {}) {
   const videoFile = new File(r.chunks, `${base}.${ext}`, { type: r.mime || "video/mp4" });
   const data = {
     app: "liftcoach", version: 2, ...r.meta, recordedAt: new Date().toISOString(),
-    video: { file: videoFile.name, width: r.c ? r.c.width : video.videoWidth, height: r.c ? r.c.height : video.videoHeight, facing, quality, audio: !!r.mic, skeleton: !!r.c },
+    video: { file: videoFile.name, width: r.c ? r.c.width : video.videoWidth, height: r.c ? r.c.height : video.videoHeight, facing, quality, audio: !!r.mic, skeleton: !!r.skeleton, zoom: frame.crop < 0.999 ? +(0.5 / frame.crop).toFixed(2) : 1 },
     note: "t — секунды от начала видео; lm — 33 точки MediaPipe [x, y, z, visibility] в долях кадра",
     ...extra,
     frames: r.frames,
   };
   const dataFile = new File([JSON.stringify(data)], `${base}.json`, { type: "application/json" });
-  last = { videoFile, dataFile, audio: !!r.mic, audioWanted: r.audioWanted, skeleton: !!r.c };
+  last = { videoFile, dataFile, audio: !!r.mic, audioWanted: r.audioWanted, skeleton: !!r.skeleton };
   return last;
 }
 

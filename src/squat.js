@@ -1,6 +1,6 @@
 // Режим «Присед»: калибровка, повторы, глубина, наклон, гриф, голос
 import { CFG } from "./config.js";
-import { px, drawSkeleton, video } from "./pose.js";
+import { px, drawSkeleton, video, frame } from "./pose.js";
 import { angle, fromVertical, sideIdx, nearSide, median } from "./geom.js";
 import { checkSide } from "./framing.js";
 import { say } from "./voice.js";
@@ -74,7 +74,7 @@ export function squatFrame(res, lm, ts) {
   // Неподвижность по тазу за последние 0.7 с
   S.hist.push({ t: ts, x: hip.x, y: hip.y });
   while (S.hist.length && ts - S.hist[0].t > 700) S.hist.shift();
-  const xs = S.hist.map(h => h.x), ys = S.hist.map(h => h.y), vh = video.videoHeight;
+  const xs = S.hist.map(h => h.x), ys = S.hist.map(h => h.y), vh = frame.h;
   const still = S.hist.length > 5 && Math.max(...xs) - Math.min(...xs) < 0.012 * vh && Math.max(...ys) - Math.min(...ys) < 0.012 * vh;
   if (!still) S.stillSince = ts;
   const stillFor = ts - S.stillSince;

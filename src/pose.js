@@ -10,7 +10,24 @@ const MODELS = {
 
 export const video = document.getElementById("video");
 export const canvas = document.getElementById("canvas");
+const view = document.getElementById("view");          // показ обрезанного кадра (зум 0.6–0.8×)
 const ctx = canvas.getContext("2d");
+const vctx = view.getContext("2d");
+
+// Рабочий кадр: при зуме 0.6–0.8× — центральная часть широкоугольного кадра.
+// Все координаты (скелет, px, размеры) — в этом кадре.
+export const frame = { w: 0, h: 0, sx: 0, sy: 0, sw: 0, sh: 0, crop: 1 };
+export let zoom = 1;                   // 0.5…1 как в «Камере» iPhone
+function updateFrame() {
+  const vw = video.videoWidth, vh = video.videoHeight;
+  const c = lens === "ultra" ? Math.min(1, 0.5 / zoom) : 1;
+  frame.crop = c;
+  frame.sw = Math.round(vw * c); frame.sh = Math.round(vh * c);
+  frame.sx = Math.round((vw - frame.sw) / 2); frame.sy = Math.round((vh - frame.sh) / 2);
+  frame.w = frame.sw; frame.h = frame.sh;
+}
+/** Нарисовать текущий рабочий кадр в контекст g размером w×h */
+export function drawFrame(g, w, h) { g.drawImage(video, frame.sx, frame.sy, frame.sw, frame.sh, 0, 0, w, h); }
 
 let landmarker = null, loadedModel = null, stream = null;
 export let facing = "environment";
@@ -53,9 +70,21 @@ async function open(constraints) {
   await video.play();
 }
 
+/** Зум 0.5…1: 1 — основная камера; меньше — широкоугольная (+ обрезка до нужного зума) */
+export async function setZoom(z) {
+  z = Math.max(0.5, Math.min(1, +z || 1));
+  const wantLens = z < 0.99 ? "ultra" : "wide";
+  zoom = z;
+  if (wantLens !== lens || !stream) await startCamera(facing, quality, wantLens);
+  if (lens !== "ultra") zoom = 1;       // широкоугольник не дали — остаёмся на 1×
+  updateFrame();
+  return zoom;
+}
+
 export async function startCamera(f = facing, q = quality, l = lens) {
   facing = f; quality = q; lens = l; lensNote = "";
-  const r = RES[q] || RES["720"];
+  // при обрезке берём кадр крупнее, чтобы после обрезки не было «мыла»
+  const r = l === "ultra" ? RES["1080"] : (RES[q] || RES["720"]);
   const base = { width: { ideal: r.width }, height: { ideal: r.height }, frameRate: { ideal: 30 } };
   if (f === "environment" && l === "ultra") {
     let d = await findUltraWide();
@@ -72,7 +101,8 @@ export async function startCamera(f = facing, q = quality, l = lens) {
     await open({ ...base, facingMode: f });
   }
   const m = facing === "user";
-  video.classList.toggle("mirror", m); canvas.classList.toggle("mirror", m);
+  video.classList.toggle("mirror", m); canvas.classList.toggle("mirror", m); view.classList.toggle("mirror", m);
+  updateFrame();
   return lens;
 }
 
@@ -89,7 +119,7 @@ const TRACK_IDX = [0, 11, 12, 23, 24, 25, 26, 27, 28];   // без рук — и
 function bodyBox(lm) {
   const pts = TRACK_IDX.map(i => lm[i]).filter(p => (p.visibility ?? 0) > 0.4);
   if (pts.length < 4) return null;
-  const W = video.videoWidth, H = video.videoHeight;
+  const W = frame.w, H = frame.h;
   const xs = pts.map(p => p.x * W), ys = pts.map(p => p.y * H);
   const core = [11, 12, 23, 24].map(i => lm[i]);
   const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
@@ -124,7 +154,7 @@ function pickPerson(list, ts) {
     boxes.forEach((b, i) => { if (b && score(b) > bs) { bs = score(b); best = i; } });
     // автофиксация: крупный человек держится на месте 1.5 с
     if (autoLock && best >= 0) {
-      const b = boxes[best], diag = Math.hypot(video.videoWidth, video.videoHeight);
+      const b = boxes[best], diag = Math.hypot(frame.w, frame.h);
       if (cand && Math.hypot(b.x - cand.x, b.y - cand.y) < 0.25 * b.size) cand.t1 = ts;
       else cand = { x: b.x, y: b.y, t0: ts, t1: ts };
       if (b.size > 0.22 * diag && cand.t1 - cand.t0 > 1500) { locked = true; lockedNow = true; }
@@ -170,13 +200,21 @@ export function startLoop(onFps) {
   const tick = () => {
     requestAnimationFrame(tick);
     if (video.readyState < 2 || !landmarker) return;
-    if (canvas.width !== video.videoWidth) { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
+    if (!frame.w || frame.sw + frame.sx * 2 !== video.videoWidth) updateFrame();
+    if (canvas.width !== frame.w || canvas.height !== frame.h) { canvas.width = frame.w; canvas.height = frame.h; }
+    // показ: обычный зум — сам <video>; обрезка — рисуем кадр на #view
+    const cropped = frame.crop < 0.999;
+    video.style.visibility = cropped ? "hidden" : "visible"; view.hidden = !cropped;
+    if (cropped) {
+      if (view.width !== frame.w || view.height !== frame.h) { view.width = frame.w; view.height = frame.h; }
+      drawFrame(vctx, frame.w, frame.h);
+    }
     const ts = performance.now(); if (ts <= lastTs) return; lastTs = ts;
     // модели хватает 640 px по длинной стороне: меньше данных гоним в GPU — выше FPS
-    const k = Math.min(1, 640 / Math.max(video.videoWidth, video.videoHeight));
-    const iw = Math.round(video.videoWidth * k), ih = Math.round(video.videoHeight * k);
+    const k = Math.min(1, 640 / Math.max(frame.w, frame.h));
+    const iw = Math.round(frame.w * k), ih = Math.round(frame.h * k);
     if (inC.width !== iw || inC.height !== ih) { inC.width = iw; inC.height = ih; }
-    inG.drawImage(video, 0, 0, iw, ih);
+    drawFrame(inG, iw, ih);
     const res = landmarker.detectForVideo(inC, ts);
     frames++;
     if (ts - fpsT > 1000) { onFps?.(Math.round(frames * 1000 / (ts - fpsT))); frames = 0; fpsT = ts; }
@@ -192,7 +230,7 @@ export function startLoop(onFps) {
 }
 
 /** Точка в пикселях кадра */
-export const px = (lm, i) => ({ x: lm[i].x * video.videoWidth, y: lm[i].y * video.videoHeight, v: lm[i].visibility ?? 1 });
+export const px = (lm, i) => ({ x: lm[i].x * frame.w, y: lm[i].y * frame.h, v: lm[i].visibility ?? 1 });
 
 export function clear() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
 
@@ -227,13 +265,12 @@ function drawOther(lm) {
 
 /** Снимок кадра со скелетом → JPEG dataURL (уменьшенный, чтобы влезал в хранилище) */
 export function snapshot(lm, maxSide = 1080) {
-  const vw = video.videoWidth, vh = video.videoHeight;
-  const k = Math.min(1, maxSide / Math.max(vw, vh));
-  const w = Math.round(vw * k), h = Math.round(vh * k);
+  const k = Math.min(1, maxSide / Math.max(frame.w, frame.h));
+  const w = Math.round(frame.w * k), h = Math.round(frame.h * k);
   const c = document.createElement("canvas"); c.width = w; c.height = h;
   const g = c.getContext("2d");
   if (facing === "user") { g.translate(w, 0); g.scale(-1, 1); }
-  g.drawImage(video, 0, 0, w, h);
+  drawFrame(g, w, h);
   if (lm) drawSkeleton(lm, { target: g, w, h, highlight: [...Array(33).keys()] });
   return c.toDataURL("image/jpeg", 0.82);
 }

@@ -51,9 +51,10 @@ export const SETTINGS_KEY = "lc.settings.v1";
 const SETTINGS_VER = 2;
 export function loadSettings() {
   const def = { v: SETTINGS_VER, height: 178, model: "auto", liveCues: true, judge: "off", autoRec: false,
-    quality: "720", audio: false, skeletonVideo: false, lens: "wide" };
+    quality: "720", audio: false, skeletonVideo: false, zoom: 1 };
   let s;
   try { s = { ...def, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") }; } catch { s = { ...def }; }
+  if (s.lens) { s.zoom = s.lens === "ultra" ? 0.5 : 1; delete s.lens; }
   if ((s.v || 1) < 2) {   // переход на v2: запись — вручную, модель — авто
     s.autoRec = false; if (s.model === "full") s.model = "auto"; s.v = 2;
   }
