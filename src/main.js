@@ -1,5 +1,5 @@
 import "./style.css";
-import { initPose, startCamera, setZoom, startLoop, setHandler, flipCamera, clear, unlockTarget, setAutoLock, justLocked, loadedModelName } from "./pose.js";
+import { initPose, startCamera, setZoom, startLoop, setHandler, flipCamera, clear, unlockTarget, setAutoLock, justLocked, loadedModelName, isLying, isStanding } from "./pose.js";
 import * as pose from "./pose.js";
 import { unlockVoice, say, quiet } from "./voice.js";
 import { unlockAudio } from "./audio.js";
@@ -107,7 +107,8 @@ const withRec = (fn, dbg) => (res, lm, ts) => {
 function startMode() {
   setupStop(); clear();
   quiet(4000);                 // первые секунды — не дёргаем подсказками, пока идёшь к снаряду
-  unlockTarget(); setAutoLock(true);   // «свой» — тот, кто ляжет/встанет на место и замрёт
+  // «свой» — тот, кто ляжет на скамью (жим) / встанет (присед) и замрёт; сидящие и проходящие не фиксируются
+  unlockTarget(); setAutoLock(true, mode === "bench" ? isLying : isStanding);
   $("squat").hidden = mode !== "squat"; $("bench").hidden = mode !== "bench";
   if (mode === "squat") { squatStart(st); setHandler(withRec(squatFrame, squatDebug)); }
   if (mode === "bench") { benchStart(st); setHandler(withRec(benchFrame, benchDebug)); }

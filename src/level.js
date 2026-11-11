@@ -30,9 +30,11 @@ export function requestLevel() {
 
 export const LEVEL_TOL = 4; // градусов
 
-export function levelHint() {
+export const BENCH_MAX_PITCH = 30;   // жим: камеру можно наклонить, чтобы смотреть сверху над страховками
+
+export function levelHint({ maxPitch = LEVEL_TOL } = {}) {
   if (!level.available) return null;
-  if (Math.abs(level.pitch) > LEVEL_TOL)
+  if (Math.abs(level.pitch) > maxPitch)
     return level.pitch > 0 ? "Наклони телефон верхом к себе" : "Наклони телефон верхом от себя";
   if (Math.abs(level.roll) > LEVEL_TOL) return "Выровняй телефон по горизонту";
   return null;

@@ -6,7 +6,7 @@
 // «Готово» — и в режим. Голос здесь почти молчит: ты и так смотришь на экран.
 import { canvas, frame, setZoom, lens, lensNote } from "./pose.js";
 import * as pose from "./pose.js";
-import { level } from "./level.js";
+import { level, BENCH_MAX_PITCH } from "./level.js";
 import { say } from "./voice.js";
 
 const $ = id => document.getElementById(id);
@@ -26,9 +26,9 @@ const GUIDE = {
   bench: {
     title: "Ракурс: жим",
     tips: [
-      "Телефон горизонтально, штатив сбоку от скамьи, чуть ближе к ногам.",
-      "Объектив чуть выше скамьи (≈ 50–70 см от пола) — это синяя линия.",
-      "Обе стойки и вся скамья — внутри рамки. Блин не должен закрывать место, где будет твоё плечо.",
+      "Телефон горизонтально. Штатив сбоку от скамьи, напротив груди, в 2–3 м — не у стоек и не у изголовья.",
+      "Подними камеру над страховками (≈ 1–1,2 м) и наклони вниз на 15–25°: опоры и блин не должны быть между камерой и тобой.",
+      "Скамья и гриф на вершине — внутри рамки. Зум 0.5–0.7.",
     ],
     zone: { x0: .08, x1: .92, y0: .25, y1: .8, label: "скамья и стойки" },
   },
@@ -36,12 +36,13 @@ const GUIDE = {
 
 function checks(mode) {
   const r = [];
-  if (mode === "bench") r.push({ label: "Телефон горизонтально", ok: frame.w > frame.h, hint: "Поверни телефон горизонтально" });
+  if (mode === "bench") r.push({ label: "Телефон горизонтально", key: "orient", ok: frame.w > frame.h, hint: "Поверни телефон горизонтально" });
   if (!level.available) r.push({ label: "Уровень (датчик недоступен)", ok: true });
   else {
-    const ok = Math.abs(level.pitch) <= TOL && Math.abs(level.roll) <= TOL;
-    r.push({ label: "Телефон ровно", ok,
-      hint: Math.abs(level.pitch) > TOL ? (level.pitch > 0 ? "Наклони телефон верхом к себе" : "Наклони телефон верхом от себя") : "Выровняй по горизонту" });
+    const maxP = mode === "bench" ? BENCH_MAX_PITCH : TOL;
+    const ok = Math.abs(level.pitch) <= maxP && Math.abs(level.roll) <= TOL;
+    r.push({ label: mode === "bench" ? `Без крена (наклон вниз до ${BENCH_MAX_PITCH}° можно)` : "Телефон ровно", key: "level", ok,
+      hint: Math.abs(level.roll) > TOL ? "Выровняй по горизонту — без крена" : (level.pitch > 0 ? "Слишком сильный наклон — наклони верхом к себе" : "Слишком сильный наклон — наклони верхом от себя") });
   }
   return r;
 }
@@ -101,8 +102,9 @@ export function setupFrame(res, lm, ts) {
   const g = canvas.getContext("2d");
   g.clearRect(0, 0, canvas.width, canvas.height);
   const r = checks(S.mode);
-  const levelOk = !level.available || r.find(c => c.label === "Телефон ровно")?.ok;
-  drawGuide(S.mode, levelOk);
+  const levelOk = !level.available || r.find(c => c.key === "level")?.ok;
+  // линия «высота объектива» имеет смысл только при ровном телефоне
+  drawGuide(S.mode, levelOk && (!level.available || Math.abs(level.pitch) <= TOL));
   $("suList").innerHTML = r.map(c => `<li class="${c.ok ? "ok" : "bad"}"><span class="dot"></span>${c.label}</li>`).join("")
     + `<li class="eye"><span class="dot"></span>Стойки и скамья внутри рамки — проверь глазами</li>`;
   const bad = r.find(c => !c.ok);

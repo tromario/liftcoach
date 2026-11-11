@@ -113,7 +113,7 @@ export const flipCamera = () => startCamera(facing === "environment" ? "user" : 
 // ~1.5 с держится на одном месте (лёг на скамью / встал под гриф), или вручную.
 // После фиксации берём того, кто ближе к прошлому положению и похож по размеру.
 // Две сильно перекрывающиеся фигуры — это один человек (модель иногда «двоит» ноги и корпус).
-let target = null, locked = false, autoLock = false, cand = null;
+let target = null, locked = false, autoLock = false, cand = null, lockPose = null;
 const TRACK_IDX = [0, 11, 12, 23, 24, 25, 26, 27, 28];   // без рук — их положение сильно меняется
 
 function bodyBox(lm) {
@@ -153,7 +153,7 @@ function pickPerson(list, ts) {
     let bs = 0;
     boxes.forEach((b, i) => { if (b && score(b) > bs) { bs = score(b); best = i; } });
     // автофиксация: крупный человек держится на месте 1.5 с
-    if (autoLock && best >= 0) {
+    if (autoLock && best >= 0 && (!lockPose || lockPose(list[best]))) {
       const b = boxes[best], diag = Math.hypot(frame.w, frame.h);
       if (cand && Math.hypot(b.x - cand.x, b.y - cand.y) < 0.25 * b.size) cand.t1 = ts;
       else cand = { x: b.x, y: b.y, t0: ts, t1: ts };
@@ -186,7 +186,16 @@ export function lockTarget() { if (target) locked = true; return locked; }
 /** Снять фиксацию — снова берём самого крупного */
 export function unlockTarget() { locked = false; target = null; cand = null; }
 /** Включить автофиксацию (в режимах присед/жим) */
-export function setAutoLock(on) { autoLock = on; }
+export function setAutoLock(on, pose = null) { autoLock = on; lockPose = pose; cand = null; }
+
+/** Поза для автофиксации: лежит (корпус почти горизонтален) / стоит (корпус почти вертикален) */
+const torsoAngle = lm => {
+  const sx = (lm[11].x + lm[12].x) / 2 * frame.w, sy = (lm[11].y + lm[12].y) / 2 * frame.h;
+  const hx = (lm[23].x + lm[24].x) / 2 * frame.w, hy = (lm[23].y + lm[24].y) / 2 * frame.h;
+  return Math.abs(Math.atan2(Math.abs(sy - hy), Math.abs(sx - hx))) * 180 / Math.PI;   // 0 — горизонтально, 90 — вертикально
+};
+export const isLying = lm => torsoAngle(lm) < 35;
+export const isStanding = lm => torsoAngle(lm) > 55;
 export const isLocked = () => locked;
 
 /** handler(result, lm|null, ts) вызывается на каждый кадр */

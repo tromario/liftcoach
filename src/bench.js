@@ -5,7 +5,7 @@
 import { CFG } from "./config.js";
 import { px, drawSkeleton, video, frame } from "./pose.js";
 import { angle, sideIdx, nearSide, median, dist } from "./geom.js";
-import { levelHint } from "./level.js";
+import { levelHint, BENCH_MAX_PITCH } from "./level.js";
 import { say } from "./voice.js";
 import { beep } from "./audio.js";
 import * as profile from "./profile.js";
@@ -43,7 +43,7 @@ function armSide(lm) {
 
 function framing(lm) {
   if (!lm) return { ok: false, hint: "Не вижу тебя" };
-  const lv = levelHint(); if (lv) return { ok: false, hint: lv };
+  const lv = levelHint({ maxPitch: BENCH_MAX_PITCH }); if (lv) return { ok: false, hint: lv };
   const side = armSide(lm); const s = sideIdx(side);
   const need = [s.sh, s.el, s.wr, s.hip];
   if (need.some(i => lm[i].x < 0.01 || lm[i].x > 0.99 || lm[i].y < 0.01 || lm[i].y > 0.99))

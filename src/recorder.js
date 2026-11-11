@@ -3,6 +3,7 @@
 // Ограничения по длительности нет. Всё копится в памяти телефона.
 // 720p — 5 Мбит/с (~37 МБ/мин), 1080p — 10 Мбит/с (~75 МБ/мин). Звук — по настройке.
 import { video, facing, quality, drawSkeleton, frame, drawFrame } from "./pose.js";
+import * as pose from "./pose.js";
 
 const BITRATE = { "720": 5_000_000, "1080": 10_000_000 };
 let rec = null;
@@ -105,7 +106,7 @@ export async function stopRecording(extra = {}) {
   const videoFile = new File(r.chunks, `${base}.${ext}`, { type: r.mime || "video/mp4" });
   const data = {
     app: "liftcoach", version: 2, ...r.meta, recordedAt: new Date().toISOString(),
-    video: { file: videoFile.name, width: r.c ? r.c.width : video.videoWidth, height: r.c ? r.c.height : video.videoHeight, facing, quality, audio: !!r.mic, skeleton: !!r.skeleton, zoom: frame.crop < 0.999 ? +(0.5 / frame.crop).toFixed(2) : 1 },
+    video: { file: videoFile.name, width: r.c ? r.c.width : video.videoWidth, height: r.c ? r.c.height : video.videoHeight, facing, quality, audio: !!r.mic, skeleton: !!r.skeleton, zoom: pose.lens === "ultra" ? pose.zoom : 1 },
     note: "t — секунды от начала видео; lm — 33 точки MediaPipe [x, y, z, visibility] в долях кадра",
     ...extra,
     frames: r.frames,
