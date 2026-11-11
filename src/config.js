@@ -51,7 +51,7 @@ export const SETTINGS_KEY = "lc.settings.v1";
 const SETTINGS_VER = 2;
 export function loadSettings() {
   const def = { v: SETTINGS_VER, height: 178, model: "auto", liveCues: true, judge: "off", autoRec: false,
-    quality: "720", audio: false, skeletonVideo: false, zoom: 1 };
+    quality: "720", audio: false, skeletonVideo: false, zoom: 1, dlStyle: "conv" };
   let s;
   try { s = { ...def, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") }; } catch { s = { ...def }; }
   if (s.lens) { s.zoom = s.lens === "ultra" ? 0.5 : 1; delete s.lens; }

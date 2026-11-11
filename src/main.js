@@ -8,6 +8,7 @@ import { loadSettings, saveSettings } from "./config.js";
 import { liveFrame, liveInit } from "./live.js";
 import { squatStart, squatFrame, squatEndSet, squatDebug, squatHistory } from "./squat.js";
 import { benchStart, benchFrame, benchEndSet, benchDebug, benchHistory } from "./bench.js";
+import { deadliftStart, deadliftFrame, deadliftEndSet, deadliftDebug, deadliftHistory, deadliftSetStyle } from "./deadlift.js";
 import { startRecording, stopRecording, recordFrame, isRecording, shareLast, recordingStatus } from "./recorder.js";
 import { resetProfile } from "./profile.js";
 import { setupStart, setupFrame, setupStop, setupDone, setLens } from "./setup.js";
@@ -84,7 +85,7 @@ async function enter(m) {
   } catch (e) { log("Ошибка: " + (e.message || e)); console.error(e); return; }
   mode = m; lowFpsSec = 0;
   $("start").hidden = true; $("stage").hidden = false;
-  $("live").hidden = m !== "live"; $("squat").hidden = true; $("bench").hidden = true;
+  $("live").hidden = m !== "live"; $("squat").hidden = true; $("bench").hidden = true; $("deadlift").hidden = true;
   $("statusChip").hidden = m === "live";
   clear();
   if (m === "live") { setAutoLock(false); setHandler(withRec(liveFrame)); }
@@ -109,8 +110,9 @@ function startMode() {
   quiet(4000);                 // первые секунды — не дёргаем подсказками, пока идёшь к снаряду
   // «свой» — тот, кто ляжет на скамью (жим) / встанет (присед) и замрёт; сидящие и проходящие не фиксируются
   unlockTarget(); setAutoLock(true, mode === "bench" ? isLying : isStanding);
-  $("squat").hidden = mode !== "squat"; $("bench").hidden = mode !== "bench";
+  $("squat").hidden = mode !== "squat"; $("bench").hidden = mode !== "bench"; $("deadlift").hidden = mode !== "deadlift";
   if (mode === "squat") { squatStart(st); setHandler(withRec(squatFrame, squatDebug)); }
+  if (mode === "deadlift") { deadliftStart(st); setHandler(withRec(deadliftFrame, deadliftDebug)); }
   if (mode === "bench") { benchStart(st); setHandler(withRec(benchFrame, benchDebug)); }
   if (st.autoRec && !isRecording()) toggleRec();
 }
@@ -118,7 +120,7 @@ function startMode() {
 /** Настройка ракурса — у телефона. Запись (если идёт) продолжается. */
 function runSetup() {
   setAutoLock(false); unlockTarget();
-  $("squat").hidden = true; $("bench").hidden = true; clear();
+  $("squat").hidden = true; $("bench").hidden = true; $("deadlift").hidden = true; clear();
   setupStart(mode, startMode, st);
   setHandler(withRec(setupFrame, () => ({ state: "setup" })));
 }
@@ -130,7 +132,7 @@ async function toggleRec() {
     say("Запись", { force: true });
   } else {
     document.querySelectorAll("[data-rec]").forEach(b => { b.textContent = "● Запись"; b.classList.remove("rec-on"); });
-    const hist = mode === "squat" ? squatHistory() : mode === "bench" ? benchHistory() : null;
+    const hist = mode === "squat" ? squatHistory() : mode === "bench" ? benchHistory() : mode === "deadlift" ? deadliftHistory() : null;
     const r = await stopRecording({ history: hist });
     if (r) {
       $("recInfo").textContent = `видео${r.skeleton ? " со скелетом" : ""} ${(r.videoFile.size / 1e6).toFixed(0)} МБ${r.audio ? " со звуком" : r.audioWanted ? " без звука (нет доступа к микрофону)" : ""} · данные ${(r.dataFile.size / 1e6).toFixed(1)} МБ`;
@@ -150,6 +152,7 @@ async function toMenu() {
 $("goLive").onclick = () => enter("live");
 $("goSquat").onclick = () => enter("squat");
 $("goBench").onclick = () => enter("bench");
+$("goDeadlift").onclick = () => enter("deadlift");
 $("goSettings").onclick = () => { $("start").hidden = true; $("settings").hidden = false; };
 $("settingsBack").onclick = () => { readSettings(); $("settings").hidden = true; $("start").hidden = false; };
 $("resetProfile").onclick = () => { if (confirm("Сбросить накопленные замеры пропорций и наклона?")) { resetProfile(); log("Замеры сброшены"); } };
@@ -170,6 +173,8 @@ $("recShare").onclick = async () => { const r = await shareLast("analysis"); if 
 $("recClose").onclick = () => { $("recDone").hidden = true; };
 $("sqEnd").onclick = () => squatEndSet();
 $("bpEnd").onclick = () => benchEndSet();
+$("dlEnd").onclick = () => deadliftEndSet();
+$("dlStyle").onclick = () => { deadliftSetStyle(st.dlStyle === "sumo" ? "conv" : "sumo"); saveSettings(st); };
 liveInit();
 
 document.addEventListener("visibilitychange", async () => {

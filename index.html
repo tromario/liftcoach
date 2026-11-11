@@ -80,6 +80,19 @@
     </div>
   </div>
 
+  <!-- Режим «Тяга» -->
+  <div id="deadlift" hidden>
+    <div id="dlPanel" class="card sq-panel" data-collapse></div>
+    <div id="dlHint" class="wz-hint">–</div>
+    <div class="bar">
+      <button data-back>Меню</button>
+      <button id="dlStyle">Классика ⇄</button>
+      <button data-setup>Ракурс</button>
+      <button data-rec>● Запись</button>
+      <button id="dlEnd" class="primary">Итог</button>
+    </div>
+  </div>
+
   <!-- Режим «Присед» -->
   <div id="squat" hidden>
     <div id="sqPanel" class="card sq-panel" data-collapse></div>
@@ -97,9 +110,10 @@
 <div id="start" class="screen">
   <h1>LiftCoach</h1>
   <p class="mut">Тренер по технике: присед, жим, тяга</p>
-  <div class="row" style="width:280px">
+  <div class="row" style="width:300px">
     <button class="primary" id="goSquat">Присед</button>
     <button class="primary" id="goBench">Жим</button>
+    <button class="primary" id="goDeadlift">Тяга</button>
   </div>
   <h3 class="settings-title">Анимации техники</h3>
   <div class="row" style="width:280px;margin-top:-6px">
