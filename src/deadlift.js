@@ -28,6 +28,8 @@ export const D = {
   earlyBackDeg: 6,         // спина «легла» на столько до колен — таз обогнал гриф
   targetTol: 4,            // ± см от твоей рабочей высоты таза
   targetTolModel: 7,       // ± см, пока цель — только модель по пропорциям
+  hbTol: 4,                // ± см: таз позади грифа по горизонтали, своя цель
+  hbTolModel: 6,           // ± см, по модели
   leanBackOk: 3, leanBackBad: 5,   // отклонение назад в локауте, °
   setupLongS: 5,           // подводка дольше — долго
   dynDipCm: 6, dynMaxMs: 700,      // признаки динамического старта
@@ -63,7 +65,7 @@ export function modelStart(style, p, height) {
   const c1 = { x: mx + dy * h / d, y: my - dx * h / d }, c2 = { x: mx - dy * h / d, y: my + dx * h / d };
   const hip = c1.x < c2.x ? c1 : c2;
   const back = Math.atan2(S.y - hip.y, S.x - hip.x) * 180 / Math.PI;
-  return { hipAboveKnee: hip.y - knee.y, hipHeight: hip.y, back };
+  return { hipAboveKnee: hip.y - knee.y, hipHeight: hip.y, hipBehind: barX - hip.x, back };
 }
 
 // ---------- твоя рабочая высота старта: из повторов с маленьким подскоком ----------
@@ -74,8 +76,10 @@ function personalTarget(style) {
   const a = loadStore()[style] || [];
   return a.length >= 3 ? median(a) : null;
 }
-function addGoodStart(style, v) {
-  const d = loadStore(); d[style] = [...(d[style] || []), Math.round(v * 10) / 10].slice(-15); saveStore(d);
+function addGoodStart(style, v, hb) {
+  const d = loadStore(); d[style] = [...(d[style] || []), Math.round(v * 10) / 10].slice(-15);
+  if (Number.isFinite(hb)) d[style + "_hb"] = [...(d[style + "_hb"] || []), Math.round(hb * 10) / 10].slice(-15);
+  saveStore(d);
 }
 
 export function deadliftStart(settings) {
@@ -106,9 +110,11 @@ const status = t => { $("modeStatus").textContent = t; };
 
 function target() {
   const pers = personalTarget(S.style);
-  if (pers != null) return { v: pers, src: "твоя" };
   const m = modelStart(S.style, props(), S.settings.height);
-  return m ? { v: m.hipAboveKnee, src: "модель" } : null;
+  const hbA = loadStore()[S.style + "_hb"] || [];
+  const hb = hbA.length >= 3 ? { hb: median(hbA), hbSrc: "твоя" } : { hb: m?.hipBehind ?? null, hbSrc: "модель" };
+  if (pers != null) return { v: pers, src: "твоя", ...hb };
+  return m ? { v: m.hipAboveKnee, src: "модель", ...hb } : null;
 }
 // пропорции: накопленный профиль → замер в этой сессии (стоя боком) → средние по росту
 function props() {
@@ -152,7 +158,7 @@ export function deadliftFrame(res, lm, ts) {
     hipA: angle(sh, hip, kn), knee: angle(hip, kn, an),
     back: Math.atan2(hip.y - sh.y, Math.abs(sh.x - hip.x)) * 180 / Math.PI,      // спина к полу: 0 — горизонтально
     lean: Math.atan2((sh.x - hip.x) * fwd, hip.y - sh.y) * 180 / Math.PI,         // от вертикали: − назад
-    hipY: hip.y, knY: kn.y, barY: wr.y, barX: wr.x, shX: sh.x, midX: (heel.x + toe.x) / 2,
+    hipY: hip.y, hipX: hip.x, knY: kn.y, barY: wr.y, barX: wr.x, shX: sh.x, midX: (heel.x + toe.x) / 2,
   };
   S.ema = S.ema ? Object.fromEntries(Object.keys(raw).map(k => [k, S.ema[k] * 0.5 + raw[k] * 0.5])) : raw;
   const m = S.ema;
@@ -191,7 +197,8 @@ export function deadliftFrame(res, lm, ts) {
   }
 
   if (S.state === "setup") {
-    S.buf.push({ t: ts, hak: hipAboveKnee, barY: raw.barY, back: m.back, shX: m.shX, barX: m.barX, midX: m.midX, fwd });
+    const hipBehind = (m.barX - m.hipX) * fwd * k;      // таз позади грифа по горизонтали, см
+    S.buf.push({ t: ts, hak: hipAboveKnee, hb: hipBehind, barY: raw.barY, back: m.back, shX: m.shX, barX: m.barX, midX: m.midX, fwd });
     while (S.buf.length && ts - S.buf[0].t > 3000) S.buf.shift();
     S.barFloor = Math.max(S.barFloor, median(S.buf.slice(-8).map(b => b.barY)));   // нижнее положение грифа (y вниз)
     status("Старт");
@@ -202,7 +209,14 @@ export function deadliftFrame(res, lm, ts) {
       const tol = tg.src === "модель" ? D.targetTolModel : D.targetTol;   // модель — ориентир, своя высота — точнее
       if (d > tol) { hint(`Таз ниже на ${Math.round(d)} см`, "bad"); say("Таз ниже", { persist: 300, repeatAfter: 6000 }); }
       else if (d < -tol) { hint(`Таз выше на ${Math.round(-d)} см`, "bad"); say("Таз выше", { persist: 300, repeatAfter: 6000 }); }
-      else hint("Высота таза — ок", "ok");
+      else {
+        // высота в норме — проверяем, как далеко таз позади грифа
+        const dh = tg.hb != null ? hipBehind - tg.hb : 0;
+        const tolH = tg.hbSrc === "модель" ? D.hbTolModel : D.hbTol;
+        if (dh > tolH) { hint(`Таз далеко от грифа на ${Math.round(dh)} см`, "bad"); say("Таз ближе к грифу", { persist: 300, repeatAfter: 6000 }); }
+        else if (dh < -tolH) { hint(`Таз слишком близко к грифу на ${Math.round(-dh)} см`, "bad"); say("Таз дальше от грифа", { persist: 300, repeatAfter: 6000 }); }
+        else hint("Таз — ок", "ok");
+      }
     }
     // отрыв: гриф поднялся над нижним положением
     const lifted = (S.barFloor - raw.barY) * k > D.liftCm;
@@ -250,7 +264,7 @@ function startPull(ts, k, tg) {
   const dynamic = dip >= D.dynDipCm && L.t - low.t <= D.dynMaxMs;
   S.rep = {
     t0: L.t, style: S.style,
-    startHip: L.hak, lowHip: low.hak, preRise: L.hak - low.hak,
+    startHip: L.hak, lowHip: low.hak, preRise: L.hak - low.hak, hipBehind: L.hb, hbTarget: tg?.hb ?? null,
     dynamic, dip, dipToLift: (L.t - low.t) / 1000,
     target: tg?.v ?? null, targetSrc: tg?.src ?? null,
     backStart: L.back, backKnee: null,
@@ -267,13 +281,13 @@ function finishRep(ts) {
   const leanBack = Math.max(0, -Math.min(...r.leans));       // насколько отклонился назад, °
   const rep = {
     n: S.set.length + 1, style: r.style,
-    startHip: r.startHip, target: r.target, targetSrc: r.targetSrc,
+    startHip: r.startHip, target: r.target, targetSrc: r.targetSrc, hipBehind: r.hipBehind, hbTarget: r.hbTarget,
     preRise: r.preRise, dynamic: r.dynamic, dip: r.dip, dipToLift: r.dipToLift,
     lowVsTarget: r.target != null ? r.lowHip - r.target : null,
     backStart: r.backStart, backDrop: r.backKnee != null ? r.backStart - r.backKnee : null,
     shAhead: r.shAhead, setupS: r.setupS, leanBack, barDrift: r.barDrift,
   };
-  if (rep.preRise <= D.preRiseOk) addGoodStart(r.style, r.startHip);
+  if (rep.preRise <= D.preRiseOk) addGoodStart(r.style, r.startHip, r.hipBehind);
   S.set.push(rep); S.rep = null;
   S.state = "setup"; S.buf = []; S.setupSince = ts; S.liftN = 0;     // гриф у пола — следующий повтор или отпустишь и встанешь
   S.lastRepEnd = ts; S.summarized = false;
@@ -318,8 +332,18 @@ function summary() {
   const withT = set.filter(r => r.target != null);
   if (withT.length) {
     const d = median(withT.map(r => r.startHip - r.target));
-    if (d > D.targetTol) parts.push(`Стартуешь с тазом выше цели примерно на ${cm(d)}.`);
-    else if (d < -D.targetTol) parts.push(`Стартуешь с тазом ниже цели примерно на ${cm(-d)}.`);
+    const tolT = withT[0].targetSrc === "модель" ? D.targetTolModel : D.targetTol;
+    if (d > tolT) parts.push(`Стартуешь с тазом выше цели примерно на ${cm(d)}.`);
+    else if (d < -tolT) parts.push(`Стартуешь с тазом ниже цели примерно на ${cm(-d)}.`);
+  }
+
+  // 3а. таз позади грифа по горизонтали
+  const withH = set.filter(r => r.hbTarget != null && Number.isFinite(r.hipBehind));
+  if (withH.length) {
+    const d = median(withH.map(r => r.hipBehind - r.hbTarget));
+    const tolH = D.hbTol + 2;
+    if (d > tolH) parts.push(`Таз в старте далеко позади грифа, примерно на ${cm(d)} больше нормы — подведи таз ближе, голени к грифу.`);
+    else if (d < -tolH) parts.push(`Таз в старте слишком близко к грифу, примерно на ${cm(-d)} — колени выдвигают гриф вперёд.`);
   }
 
   // 3б. плечи относительно грифа при отрыве (классика: 2–5 см впереди; сумо: над грифом или чуть впереди)
@@ -356,17 +380,17 @@ function render(lastSummary) {
   const set = S.set.length ? S.set : (S.sets.at(-1) || []);
   const tg = target();
   const m = modelStart(S.style, props(), S.settings.height);
-  let html = `<div class="mut small">${S.style === "sumo" ? "Сумо" : "Классика"} · цель: таз над коленом ${tg ? f0(tg.v) + " см (" + tg.src + ")" : "–"}`
+  let html = `<div class="mut small">${S.style === "sumo" ? "Сумо" : "Классика"} · цель: таз над коленом ${tg ? f0(tg.v) + " см (" + tg.src + ")" : "–"}, позади грифа ${tg?.hb != null ? f0(tg.hb) + " см (" + tg.hbSrc + ")" : "–"}`
     + (m ? ` · угол спины ≈ ${f0(m.back)}°` : "") + `</div>`;
   if (set.length) {
-    html += `<table><tr><th>#</th><th>Старт</th><th>Подскок</th><th>Спина</th><th>Локаут</th><th></th></tr>`;
+    html += `<table><tr><th>#</th><th>Старт</th><th>За грифом</th><th>Подскок</th><th>Спина</th><th>Локаут</th><th></th></tr>`;
     for (const r of set) {
       const preCls = r.preRise > D.preRiseBad ? ' class="down"' : r.preRise > D.preRiseOk ? ' class="up"' : "";
       const flags = [r.dynamic ? `нырок ${f0(r.dip)}` : "", r.setupS > D.setupLongS ? `подводка ${f0(r.setupS)} с` : "", r.barDrift > 6 ? "гриф от ног" : ""].filter(Boolean).join(", ");
-      html += `<tr><td>${r.n}</td><td>${f0(r.startHip)} см</td><td${preCls}>${r.preRise.toFixed(1)} см</td>`
+      html += `<tr><td>${r.n}</td><td>${f0(r.startHip)} см</td><td>${f0(r.hipBehind)} см</td><td${preCls}>${r.preRise.toFixed(1)} см</td>`
         + `<td>${r.backDrop != null ? sg(-r.backDrop) + "°" : "–"}</td><td>${r.leanBack > 0.5 ? "−" + f0(r.leanBack) + "°" : "ровно"}</td><td class="small">${flags}</td></tr>`;
     }
-    html += `</table><div class="mut small">Старт — таз над коленом при отрыве. Подскок — подъём таза до отрыва (хорошо ≤ ${D.preRiseOk} см). Спина — как изменился угол спины до колен (минус — таз обгоняет гриф). Локаут — отклонение назад.</div>`;
+    html += `</table><div class="mut small">Старт — таз над коленом при отрыве. За грифом — таз позади грифа по горизонтали. Подскок — подъём таза до отрыва (хорошо ≤ ${D.preRiseOk} см). Спина — как изменился угол спины до колен (минус — таз обгоняет гриф). Локаут — отклонение назад.</div>`;
   }
   if (lastSummary) html += `<div class="small" style="margin-top:6px">${lastSummary}</div>`;
   $("dlPanel").innerHTML = html;
