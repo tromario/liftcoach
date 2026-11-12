@@ -113,7 +113,7 @@ export const flipCamera = () => startCamera(facing === "environment" ? "user" : 
 // ~1.5 с держится на одном месте (лёг на скамью / встал под гриф), или вручную.
 // После фиксации берём того, кто ближе к прошлому положению и похож по размеру.
 // Две сильно перекрывающиеся фигуры — это один человек (модель иногда «двоит» ноги и корпус).
-let target = null, locked = false, autoLock = false, cand = null, lockPose = null;
+let target = null, locked = false, autoLock = false, cand = null, lockPose = null, rival = null, gen = 0;
 const TRACK_IDX = [0, 11, 12, 23, 24, 25, 26, 27, 28];   // без рук — их положение сильно меняется
 
 function bodyBox(lm) {
@@ -157,7 +157,7 @@ function pickPerson(list, ts) {
       const b = boxes[best], diag = Math.hypot(frame.w, frame.h);
       if (cand && Math.hypot(b.x - cand.x, b.y - cand.y) < 0.25 * b.size) cand.t1 = ts;
       else cand = { x: b.x, y: b.y, t0: ts, t1: ts };
-      if (b.size > 0.22 * diag && cand.t1 - cand.t0 > 1500) { locked = true; lockedNow = true; }
+      if (b.size > 0.22 * diag && cand.t1 - cand.t0 > 1500) { locked = true; lockedNow = true; gen++; }
     }
   } else {
     const radius = target.size * (ts - target.t < 500 ? 0.6 : 1.0);   // потеряли — ищем шире
@@ -168,6 +168,26 @@ function pickPerson(list, ts) {
       const d = Math.hypot(b.x - target.x, b.y - target.y);
       if (ratio < 1.8 && d < radius && d < bd) { bd = d; best = i; }
     });
+    // перефиксация: в кадре держится человек намного крупнее «своего» (зафиксировались на ком-то сзади,
+    // а ты подошёл к грифу) — через 1.2 с переключаемся на него
+    let ri = -1;
+    boxes.forEach((b, i) => {
+      if (!b || i === best) return;
+      if (best >= 0 && boxes[best] && overlap(b, boxes[best]) > 0.3) return;
+      if (b.size > 1.6 * target.size && (ri < 0 || b.size > boxes[ri].size)) ri = i;
+    });
+    if (ri >= 0) {
+      const b = boxes[ri];
+      if (rival && Math.hypot(b.x - rival.x, b.y - rival.y) < 0.35 * b.size) { rival.t1 = ts; rival.x = b.x; rival.y = b.y; }
+      else rival = { x: b.x, y: b.y, t0: ts, t1: ts };
+      if (rival.t1 - rival.t0 > 1200) { target = { ...b, t: ts }; best = ri; rival = null; lockedNow = true; gen++; return best; }
+    } else rival = null;
+    // «своего» не видно больше 2 с — берём самого крупного (ушёл и вернулся / ошиблись с фиксацией)
+    if (best < 0 && ts - target.t > 2000) {
+      let bs = 0;
+      boxes.forEach((b, i) => { if (b && score(b) > bs) { bs = score(b); best = i; } });
+      if (best >= 0) { target = { ...boxes[best], t: ts }; gen++; return best; }
+    }
   }
   if (best >= 0) {
     const b = boxes[best];
@@ -184,7 +204,9 @@ export function justLocked() { const v = lockedNow; lockedNow = false; return v;
 /** Зафиксировать текущего человека как «своего» */
 export function lockTarget() { if (target) locked = true; return locked; }
 /** Снять фиксацию — снова берём самого крупного */
-export function unlockTarget() { locked = false; target = null; cand = null; }
+export function unlockTarget() { locked = false; target = null; cand = null; rival = null; gen++; }
+/** Номер фиксации: меняется при каждой (пере)фиксации — режимы сбрасывают замеры */
+export const lockGen = () => gen;
 /** Включить автофиксацию (в режимах присед/жим) */
 export function setAutoLock(on, pose = null) { autoLock = on; lockPose = pose; cand = null; }
 

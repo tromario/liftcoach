@@ -5,7 +5,7 @@
 // Рабочая сторона тела фиксируется на подход: дальняя нога в профиль часто «ломается».
 // Кадры с невозможной длиной бедра/голени (скелет сломан блином) — пропускаем.
 import { CFG } from "./config.js";
-import { px, drawSkeleton } from "./pose.js";
+import { px, drawSkeleton, lockGen } from "./pose.js";
 import { angle, fromVertical, sideIdx, nearSide, median, dist } from "./geom.js";
 import { checkSide } from "./framing.js";
 import { say } from "./voice.js";
@@ -34,7 +34,7 @@ export function squatStart(settings) {
     settings,
     scaleBuf: [], scale: NaN,
     heelBuf: [], heelBase: NaN,
-    thighBuf: [], shinBuf: [],
+    thighBuf: [], shinBuf: [], rejSince: 0, gen: lockGen(),
     set: [], sets: [],
     state: "idle", rep: null, side: null,
     armAnkX: 0, setAnkX: null,
@@ -98,6 +98,13 @@ export function squatFrame(res, lm, ts) {
   const vis = i => lm[i].visibility ?? 0;
   const lenOk = !Number.isFinite(tMed) || (thighPx / tMed > Q.segLo && thighPx / tMed < Q.segHi && shinPx / sMed > Q.segLo && shinPx / sMed < Q.segHi);
   const valid = lenOk && vis(s.hip) > 0.5 && vis(s.kn) > 0.5 && vis(s.an) > 0.4;
+  // замер стойки был не с тебя (зафиксировались на другом / сменился человек) — кадры «битые» подряд дольше 1.2 с: перемеряем
+  if (lockGen() !== S.gen || (!lenOk && valid === false && Number.isFinite(tMed) && (S.rejSince ||= ts) && ts - S.rejSince > 1200 && !S.rep && S.state === "idle")) {
+    S.gen = lockGen(); S.thighBuf = []; S.shinBuf = []; S.rejSince = 0; S.ema = null; S.hist = [];
+    if (S.state === "armed") { S.state = "idle"; S.side = null; }
+    return;
+  }
+  if (lenOk) S.rejSince = 0;
   if (!valid) { if (S.rep) S.rep.unseen++; return; }
 
   const fwd = Math.sign(toe.x - heel.x) || 1;
