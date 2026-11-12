@@ -12,6 +12,7 @@ import { deadliftStart, deadliftFrame, deadliftEndSet, deadliftDebug, deadliftHi
 import { startRecording, stopRecording, recordFrame, isRecording, shareLast, recordingStatus } from "./recorder.js";
 import { resetProfile } from "./profile.js";
 import { setupStart, setupFrame, setupStop, setupDone, setLens } from "./setup.js";
+import { analyzeInit, analyzeOpen, analyzeClose } from "./analyze.js";
 
 const $ = id => document.getElementById(id);
 const log = t => $("log").textContent = t;
@@ -176,6 +177,17 @@ $("bpEnd").onclick = () => benchEndSet();
 $("dlEnd").onclick = () => deadliftEndSet();
 $("dlStyle").onclick = () => { deadliftSetStyle(st.dlStyle === "sumo" ? "conv" : "sumo"); saveSettings(st); };
 liveInit();
+
+// ---------- Разбор видео ----------
+analyzeInit(st, async () => {
+  if (!loadedModelName()) {
+    log("Загружаю модель…");
+    const d = await initPose(modelFor(st.model));
+    $("modelChip").textContent = (st.model === "auto" ? "авто: " : "") + modelFor(st.model) + " · " + d;
+  }
+});
+$("goAnalyze").onclick = () => { readSettings(); $("start").hidden = true; $("analyze").hidden = false; analyzeOpen(); };
+$("anBack").onclick = () => { analyzeClose(); $("analyze").hidden = true; $("start").hidden = false; };
 
 document.addEventListener("visibilitychange", async () => {
   if (document.visibilityState === "visible" && mode) { try { await navigator.wakeLock?.request("screen"); } catch {} }

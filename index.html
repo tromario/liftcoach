@@ -121,9 +121,39 @@
     <a class="btn" href="./anim/bench.html">Жим</a>
     <a class="btn" href="./anim/deadlift.html">Тяга</a>
   </div>
+  <button id="goAnalyze">Разбор видео</button>
   <button id="goLive">Живые углы</button>
   <button id="goSettings">Настройки</button>
   <div id="log" class="mut small"></div>
+</div>
+
+<!-- Разбор ранее снятого видео -->
+<div id="analyze" class="screen" hidden>
+  <h2>Разбор видео</h2>
+  <p class="mut small an-note">Видео из галереи (снятое приложением, камерой iPhone или присланное). Для записей LiftCoach можно выбрать и видео, и JSON — разбор будет мгновенным.</p>
+  <label class="btn an-pick">Выбрать видео / JSON
+    <input id="anFile" type="file" accept="video/*,.json,application/json" multiple hidden>
+  </label>
+  <div id="anFiles" class="mut small"></div>
+  <label class="field">Упражнение
+    <select id="anMode">
+      <option value="squat">Присед</option>
+      <option value="bench">Жим</option>
+      <option value="conv">Тяга — классика</option>
+      <option value="sumo">Тяга — сумо</option>
+    </select>
+  </label>
+  <button id="anRun" class="primary" disabled>Разобрать</button>
+  <button id="anStop" hidden>Стоп</button>
+  <div id="anProg" class="mut small"></div>
+  <div id="anWrap" class="an-wrap" hidden>
+    <video id="anVideo" playsinline muted preload="metadata"></video>
+    <canvas id="anOver"></canvas>
+  </div>
+  <div id="anCues" class="an-cues"></div>
+  <div id="anPanel" class="card an-panel"></div>
+  <button id="anSave" hidden>Сохранить JSON разбора</button>
+  <button id="anBack">Меню</button>
 </div>
 
 <!-- Настройки -->

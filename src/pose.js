@@ -34,7 +34,12 @@ export let facing = "environment";
 export let quality = "720";
 const RES = { "720": { width: 1280, height: 720 }, "1080": { width: 1920, height: 1080 } };
 let handler = null;
-let running = false;
+let running = false, paused = false;
+// VIDEO-режим MediaPipe требует строго растущие метки времени — общие для живого цикла и разбора файла
+let lastDetectTs = 0;
+const nextTs = t => (lastDetectTs = Math.max(t, lastDetectTs + 1));
+/** Пауза живого цикла (на время разбора файла) */
+export function pauseLoop(on) { paused = on; }
 
 export const loadedModelName = () => loadedModel;
 
@@ -230,7 +235,7 @@ export function startLoop(onFps) {
   let frames = 0, fpsT = performance.now(), lastTs = -1;
   const tick = () => {
     requestAnimationFrame(tick);
-    if (video.readyState < 2 || !landmarker) return;
+    if (paused || video.readyState < 2 || !landmarker) return;
     if (!frame.w || frame.sw + frame.sx * 2 !== video.videoWidth) updateFrame();
     if (canvas.width !== frame.w || canvas.height !== frame.h) { canvas.width = frame.w; canvas.height = frame.h; }
     // показ: обычный зум — сам <video>; обрезка — рисуем кадр на #view
@@ -241,12 +246,13 @@ export function startLoop(onFps) {
       drawFrame(vctx, frame.w, frame.h);
     }
     const ts = performance.now(); if (ts <= lastTs) return; lastTs = ts;
+    if (ts <= lastDetectTs) return;      // после разбора файла метки ушли вперёд — пропускаем кадр
     // модели хватает 640 px по длинной стороне: меньше данных гоним в GPU — выше FPS
     const k = Math.min(1, 640 / Math.max(frame.w, frame.h));
     const iw = Math.round(frame.w * k), ih = Math.round(frame.h * k);
     if (inC.width !== iw || inC.height !== ih) { inC.width = iw; inC.height = ih; }
     drawFrame(inG, iw, ih);
-    const res = landmarker.detectForVideo(inC, ts);
+    const res = landmarker.detectForVideo(inC, nextTs(ts));
     frames++;
     if (ts - fpsT > 1000) { onFps?.(Math.round(frames * 1000 / (ts - fpsT))); frames = 0; fpsT = ts; }
     const all = res.landmarks || [];
@@ -259,6 +265,29 @@ export function startLoop(onFps) {
   };
   requestAnimationFrame(tick);
 }
+
+/**
+ * Разбор кадра из файла: source — <video>/<canvas> размером w×h. Возвращает { res, lm } (lm — «свой» человек).
+ * Рабочий кадр переключается на размеры файла; живой цикл на это время должен стоять на паузе.
+ */
+const fC = document.createElement("canvas"), fG = fC.getContext("2d");
+export function detectFile(source, w, h, ts) {
+  if (!landmarker) throw new Error("модель не загружена");
+  Object.assign(frame, { w, h, sx: 0, sy: 0, sw: w, sh: h, crop: 1 });
+  const k = Math.min(1, 640 / Math.max(w, h));
+  const iw = Math.round(w * k), ih = Math.round(h * k);
+  if (fC.width !== iw || fC.height !== ih) { fC.width = iw; fC.height = ih; }
+  fG.drawImage(source, 0, 0, iw, ih);
+  const res = landmarker.detectForVideo(fC, nextTs(performance.now()));
+  const all = res.landmarks || [];
+  const idx = all.length ? pickPerson(all, ts) : -1;
+  return { res, lm: idx >= 0 ? all[idx] : null };
+}
+/** Вернуть рабочий кадр к камере (после разбора файла) */
+export const resetFrame = () => updateFrame();
+/** Задать рабочий кадр (для повтора записанных точек из JSON) */
+export function setFileFrame(w, h) { Object.assign(frame, { w, h, sx: 0, sy: 0, sw: w, sh: h, crop: 1 }); }
+export { BONES };
 
 /** Точка в пикселях кадра */
 export const px = (lm, i) => ({ x: lm[i].x * frame.w, y: lm[i].y * frame.h, v: lm[i].visibility ?? 1 });

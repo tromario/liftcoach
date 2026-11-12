@@ -11,9 +11,15 @@ speechSynthesis.onvoiceschanged = pick; pick();
 const spokenAt = new Map();     // фраза → когда звучала
 const pending = new Map();      // фраза → { first, last } для persist
 let lastAny = 0, quietUntil = 0;
+// Разбор видео: фразы не произносятся, а собираются (sink), время — по видео (clock)
+let sink = null, clock = null;
+const nowMs = () => (clock ? clock() : performance.now());
+/** Перехват фраз: sink(text, force) и часы clock() в мс; null — обычная речь */
+export function setSink(fn, clk = null) { sink = fn; clock = fn ? clk : null; spokenAt.clear(); pending.clear(); lastAny = -1e9; quietUntil = 0; }
 const MIN_GAP = 1500;
 
-function speak(text) {
+function speak(text, force = false) {
+  if (sink) { sink(text, force); return; }
   const u = new SpeechSynthesisUtterance(text);
   u.lang = "ru-RU"; if (ruVoice) u.voice = ruVoice; u.rate = 1.1;
   speechSynthesis.speak(u);
@@ -21,9 +27,10 @@ function speak(text) {
 
 export function say(text, { force = false, repeatAfter = 7000, persist = 0 } = {}) {
   if (!text) return;
-  const now = performance.now();
+  const now = nowMs();
   if (force) {
-    speechSynthesis.cancel(); speak(text);
+    if (!sink) speechSynthesis.cancel();
+    speak(text, true);
     spokenAt.set(text, now); lastAny = now; pending.delete(text);
     return;
   }
@@ -35,13 +42,13 @@ export function say(text, { force = false, repeatAfter = 7000, persist = 0 } = {
     if (now - p.first < persist) return;
   }
   if (now - (spokenAt.get(text) ?? -1e9) < repeatAfter) return;
-  if (speechSynthesis.speaking || speechSynthesis.pending || now - lastAny < MIN_GAP) return;
+  if ((!sink && (speechSynthesis.speaking || speechSynthesis.pending)) || now - lastAny < MIN_GAP) return;
   speak(text);
   spokenAt.set(text, now); lastAny = now; pending.delete(text);
 }
 
 /** Помолчать ms миллисекунд (обычные подсказки не звучат, force — звучит) */
-export function quiet(ms) { quietUntil = performance.now() + ms; }
+export function quiet(ms) { quietUntil = nowMs() + ms; }
 
 /** iOS разрешает речь только из обработчика нажатия — вызвать при старте (беззвучно) */
 export function unlockVoice() {
