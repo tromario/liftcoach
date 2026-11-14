@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Жим лёжа: где лечь под гриф — LiftCoach</title>
+<style>
+/* Layout: заголовок, вид сверху (главный) + полоса сбоку, выбор положения, замеры, карточки */
+:root{
+  --bg:#000; --panel:#141414; --fg:#f2f2f2; --muted:#9a9a9a; --line:#2a2a2a;
+  --body:#d9e4dd; --far:#5d6b64; --bar:#c9d1cc; --plate:#3fbf8c; --accent:#ff5a36; --warn:#e9a640; --bad:#ff5a5a; --ok:#3ddc84; --guide:#6f9bff; --rack:#6a7871; --bench:#3a3f3c;
+  --ff-d:-apple-system,"Arial Narrow",Arial,sans-serif; --ff-m:ui-monospace,Menlo,monospace; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--ff-d);font-size:16px}
+.wrap{max-width:1100px;margin:0 auto;padding-top:calc(env(safe-area-inset-top,0px) + 12px);padding-bottom:calc(env(safe-area-inset-bottom,0px) + 40px);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:16px}
+.back{display:inline-block;color:var(--accent);text-decoration:none;font-weight:600;font-size:17px;padding:6px 0}
+h1{font-size:clamp(26px,4vw,38px);margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:4px 0 0;max-width:72ch;line-height:1.45}
+.views{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:12px}
+@media (max-width:760px){.views{grid-template-columns:1fr}}
+.view{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;min-width:0;display:grid;gap:6px;align-content:start}
+.view h2{margin:0;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+canvas{width:100%;display:block;max-width:100%}
+#top{aspect-ratio:4/3}
+#side{aspect-ratio:10/7}
+.pos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.pos button{font:600 14px/1.25 var(--ff-d);background:#222;color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:10px 8px;cursor:pointer;min-height:56px}
+.pos button[aria-pressed=true]{border-color:var(--accent);background:#2a1712}
+.pos small{display:block;color:var(--muted);font-weight:400;margin-top:2px}
+.ctrl{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+#play{font:600 15px var(--ff-d);background:var(--accent);color:#fff;border:0;border-radius:8px;padding:8px 16px;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--guide);outline-offset:2px}
+label{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:14px}
+input[type=range]{width:170px;accent-color:var(--accent)}
+.phase{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;align-items:baseline}
+.phase .name{font-weight:700;font-size:20px;color:var(--accent)}
+.verdict{font-size:17px;line-height:1.4}
+.verdict.ok{color:var(--ok)} .verdict.warn{color:var(--warn)} .verdict.bad{color:var(--bad)}
+.readout{font-family:var(--ff-m);font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px 18px;font-variant-numeric:tabular-nums}
+.readout b{color:var(--fg);font-weight:600}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted)}
+.sw{display:inline-block;width:18px;height:3px;vertical-align:middle;margin-right:6px;border-radius:2px}
+.cues{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.cue-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
+.cue-card h3{margin:0 0 6px;font-size:16px}
+.cue-card ul{margin:0;padding-left:18px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="../">← LiftCoach</a>
+  <header>
+    <h1>Жим лёжа: где лечь под гриф</h1>
+    <p class="sub">Вид сверху: насколько далеко от стоек лечь, чтобы съём был коротким, а на локауте гриф не задевал крюки. Ориентир — <b>глаза прямо под грифом</b>, когда он лежит на крюках. Пропорции под рост 178 см, хват около 81 см.</p>
+  </header>
+
+  <div class="pos" role="group" aria-label="Где лечь">
+    <button type="button" data-d="-11">Близко к стойкам<small>гриф над ртом</small></button>
+    <button type="button" data-d="0" aria-pressed="true">Правильно<small>глаза под грифом</small></button>
+    <button type="button" data-d="13">Далеко от стоек<small>гриф над макушкой</small></button>
+  </div>
+
+  <div class="views">
+    <div class="view"><h2>Сверху</h2><canvas id="top" aria-label="Вид сверху: скамья, стойки, гриф и лифтер"></canvas></div>
+    <div class="view"><h2>Сбоку — та же укладка</h2><canvas id="side" aria-label="Вид сбоку: высота грифа и крюков"></canvas>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--guide)"></i>путь грифа</span>
+        <span><i class="sw" style="background:var(--warn)"></i>линия глаз</span>
+        <span><i class="sw" style="background:var(--rack)"></i>стойки и крюки</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="ctrl">
+    <button id="play" type="button">Пауза</button>
+    <label for="d">Глаза от грифа <input id="d" type="range" min="-16" max="18" step="1" value="0"> <b id="dv" style="color:var(--fg);min-width:7ch">0 см</b></label>
+    <label for="speed">Скорость <input id="speed" type="range" min="0.25" max="1.5" step="0.05" value="0.7"></label>
+  </div>
+
+  <div class="view">
+    <div class="phase"><span class="name" id="pname">Укладка</span><span class="verdict" id="verdict"></span></div>
+    <div class="readout">
+      <span>гриф на крюках над: <b id="r-over">—</b></span>
+      <span>съём до плеч: <b id="r-un">—</b></span>
+      <span>локаут до крюков: <b id="r-gap">—</b></span>
+      <span>касание от крюков: <b id="r-touch">—</b></span>
+    </div>
+  </div>
+
+  <div class="cues">
+    <div class="cue-card"><h3>Как лечь</h3><ul>
+      <li>Ложишься, смотришь вверх: гриф на крюках — прямо над глазами, можно чуть ближе ко лбу.</li>
+      <li>Считается положение уже после постановки ног и прогиба. Если, ставя ноги, съезжаешь к ногам или к стойкам, ложись с поправкой на это.</li>
+      <li>Проверка на пустом грифе: съём — короткое движение руками назад-вверх, а на локауте гриф над плечами и не касается крюков.</li>
+    </ul></div>
+    <div class="cue-card"><h3>Близко к стойкам</h3><ul>
+      <li>Гриф на крюках над ртом или подбородком — снимать легко, но локаут всего в нескольких сантиметрах от крюков.</li>
+      <li>При жиме назад к плечам гриф может задеть крюки — сорванный повтор и риск.</li>
+      <li>При постановке на стойки почти нет места для ошибки.</li>
+    </ul></div>
+    <div class="cue-card"><h3>Далеко от стоек</h3><ul>
+      <li>Гриф над макушкой — съём длинный: руки уходят за голову, плечи выходят вперёд, сведение лопаток теряется ещё до первого повтора.</li>
+      <li>Постановка на стойки после подхода — на прямых руках далеко назад, тяжело и опасно на отказе.</li>
+      <li>Без помощника на съёме лучше ложиться ближе.</li>
+    </ul></div>
+  </div>
+</div>
+
+<script>
+// Единицы — см. Ось x — вдоль скамьи к ногам, 0 — гриф на крюках. Ось y — поперёк. Ось z — высота от пола.
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const C = {};
+for (const n of ["fg","muted","line","body","far","bar","plate","accent","warn","bad","ok","guide","rack","bench"]) C[n] = css("--" + n);
+
+const G = {
+  hookLip: 3,          // передний край крюка (к ногам) от оси грифа
+  upright: -9,         // ось стоек (к голове от грифа)
+  uprightY: 61,        // стойки по бокам
+  benchTop: 43,        // высота скамьи
+  hookZ: 104,          // гриф на крюках
+  lockZ: 112,          // гриф на прямых руках
+  chestZ: 70,          // касание (с прогибом)
+  grip: 40.5,          // половина хвата
+  eyeToSh: 20,         // глаза → плечевой сустав вдоль тела
+  eyeToTouch: 37,      // глаза → точка касания (низ груди)
+  benchFrom: -14, benchTo: 108, benchHalf: 15,
+};
+
+// --- состояние ---
+let dTarget = 0, dCur = 0, playing = true, t = 0, last = performance.now();
+const elD = document.getElementById("d"), elSpeed = document.getElementById("speed");
+
+// фазы анимации (сек при скорости 1)
+const PH = [
+  ["Укладка", 1.6], ["Хват", 0.7], ["Съём", 1.2], ["Локаут", 0.6], ["Опускание", 1.5],
+  ["Касание", 0.5], ["Жим", 1.3], ["Локаут", 0.6], ["На стойки", 1.2], ["", 1.0],
+];
+const TOTAL = PH.reduce((a, p) => a + p[1], 0);
+const ease = x => x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+
+function phaseAt(tt) {
+  let acc = 0;
+  for (let i = 0; i < PH.length; i++) { if (tt < acc + PH[i][1]) return { i, k: (tt - acc) / PH[i][1] }; acc += PH[i][1]; }
+  return { i: PH.length - 1, k: 1 };
+}
+
+// положение грифа и тела в момент t
+function pose(tt, d) {
+  const { i, k } = phaseAt(tt), e = ease(k);
+  const shX = d + G.eyeToSh, touchX = d + G.eyeToTouch;
+  let bx = 0, bz = G.hookZ, slide = 0;
+  if (i === 0) slide = (1 - e) * 35;                         // съезжает к нужному месту
+  else if (i === 1) {}
+  else if (i === 2) { bx = shX * e; bz = G.hookZ + (G.lockZ - G.hookZ) * Math.min(1, k * 2.5); }
+  else if (i === 3 || i === 7) { bx = shX; bz = G.lockZ; }
+  else if (i === 4) { bx = shX + (touchX - shX) * e; bz = G.lockZ + (G.chestZ - G.lockZ) * e; }
+  else if (i === 5) { bx = touchX; bz = G.chestZ; }
+  else if (i === 6) { // путь «назад к плечам»: сначала вверх, потом назад
+    bx = touchX + (shX - touchX) * Math.pow(k, 1.4); bz = G.chestZ + (G.lockZ - G.chestZ) * Math.pow(e, 0.8);
+  }
+  else if (i === 8) { bx = shX * (1 - e); bz = G.lockZ - (G.lockZ - G.hookZ) * Math.max(0, (k - 0.6) / 0.4); }
+  const gripOn = i >= 1 && i <= 8;
+  return { phase: PH[i][0], i, bx, bz, eyeX: d + slide, gripOn };
+}
+
+// --- холсты ---
+function fit(c) {
+  const dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight;
+  if (c.width !== Math.round(w * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+  const g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+  return { g, w, h };
+}
+const ell = (g, x, y, rx, ry) => { g.beginPath(); g.ellipse(x, y, Math.max(rx, .1), Math.max(ry, .1), 0, 0, 7); };
+function line(g, pts, color, wdt, dash) {
+  g.strokeStyle = color; g.lineWidth = wdt; g.setLineDash(dash || []); g.lineCap = "round"; g.lineJoin = "round";
+  g.beginPath(); pts.forEach((p, j) => j ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.stroke(); g.setLineDash([]);
+}
+function label(g, txt, x, y, color, align = "left", size = 12) {
+  g.font = `600 ${size}px -apple-system,Arial,sans-serif`; g.fillStyle = color; g.textAlign = align; g.textBaseline = "middle"; g.fillText(txt, x, y);
+}
+
+// ВИД СВЕРХУ (как видит страхующий): голова вверху, ноги внизу, гриф поперёк.
+// Модель: x — вдоль скамьи к ногам, y — поперёк. На экране x → вниз, y → вправо.
+function drawTop(P, trail) {
+  const { g, w, h } = fit(document.getElementById("top"));
+  const X0 = -26, X1 = 132, Y0 = -112, Y1 = 112;
+  const s = Math.min(w / (Y1 - Y0), h / (X1 - X0));
+  const ox = w / 2, oy = (h - (X1 - X0) * s) / 2 - X0 * s;
+  const T = (x, y) => [ox + y * s, oy + x * s];
+  const R = (x0, y0, x1, y1, col) => { const a = T(Math.min(x0, x1), Math.min(y0, y1)); g.fillStyle = col; g.fillRect(a[0], a[1], Math.abs(y1 - y0) * s, Math.abs(x1 - x0) * s); };
+  const E = (x, y, rx, ry, col) => { g.fillStyle = col; ell(g, ...T(x, y), ry * s, rx * s); g.fill(); };
+  const top = { g, T, R, E, s };
+
+  // скамья
+  { const a = T(G.benchFrom, -G.benchHalf); g.fillStyle = C.bench; g.beginPath(); g.roundRect(a[0], a[1], 2 * G.benchHalf * s, (G.benchTo - G.benchFrom) * s, 6 * s); g.fill(); }
+  // стойки + крюки
+  for (const sy of [-1, 1]) {
+    R(G.upright - 4, sy * G.uprightY - 4, G.upright + 4, sy * G.uprightY + 4, C.rack);
+    R(G.upright + 4, sy * G.uprightY - 2.5, G.hookLip, sy * G.uprightY + 2.5, C.rack);
+  }
+  line(g, [T(0, -104), T(0, 104)], C.rack, 1, [4, 5]);      // где лежит гриф на крюках
+
+  drawLifterTop(top, P);
+
+  // ход грифа вдоль скамьи (от крюков до касания)
+  if (trail) {
+    const yy = -G.grip - 14;
+    line(g, [T(trail[0], yy), T(trail[1], yy)], C.guide, 4);
+  }
+  // гриф + блины
+  const bx = P.bx;
+  line(g, [T(bx, -108), T(bx, 108)], C.bar, 3.2);
+  for (const sy of [-1, 1]) { R(bx - 22.5, sy * 74, bx + 22.5, sy * 82, C.plate); R(bx - 20, sy * 82, bx + 20, sy * 88, "#2f8f69"); }
+  // линия глаз
+  const ex = P.eyeX;
+  line(g, [T(ex, -30), T(ex, 30)], C.warn, 2, [6, 5]);
+  label(g, "глаза", ...T(ex, 32), C.warn, "left");
+  label(g, "стойки", ...T(G.upright - 9, G.uprightY), C.muted, "center");
+  label(g, "к ногам ↓", ...T(X1 - 4, 100), C.muted, "right");
+  // расстояние глаза ↔ гриф на крюках
+  if (P.i <= 1 || P.i === 9) {
+    const yy = -46, a = T(0, yy), b = T(ex, yy);
+    if (Math.abs(ex) > 0.5) line(g, [a, b], C.fg, 2);
+    label(g, Math.round(ex) === 0 ? "глаза под грифом" : `глаза ${ex > 0 ? "ниже" : "выше"} грифа на ${Math.abs(Math.round(ex))} см`, ...T(-22, 0), C.fg, "center", 14);
+  }
+}
+
+function drawLifterTop({ g, T, R, E, s }, P) {
+  const d = P.eyeX, B = C.body;
+  // ноги: бёдра к коленям, голени вниз к полу, стопы чуть ближе к голове, чем колени
+  for (const sy of [-1, 1]) {
+    line(g, [T(d + 76, sy * 9), T(d + 110, sy * 25)], B, 13 * s);
+    line(g, [T(d + 110, sy * 25), T(d + 104, sy * 33)], B, 10 * s);
+    E(d + 103, sy * 35, 9, 4.5, B);
+  }
+  // корпус
+  g.fillStyle = B; g.beginPath();
+  const pts = [[d + 16, -20], [d + 22, -23], [d + 50, -18], [d + 62, -15], [d + 78, -18], [d + 80, 0], [d + 78, 18], [d + 62, 15], [d + 50, 18], [d + 22, 23], [d + 16, 20]];
+  pts.forEach((p, j) => { const q = T(p[0], p[1]); j ? g.lineTo(...q) : g.moveTo(...q); }); g.closePath(); g.fill();
+  // шея + голова лицом вверх
+  R(d + 8, -6, d + 18, 6, B);
+  E(d - 1, 0, 11.5, 8, B);
+  for (const sy of [-1, 1]) E(d, sy * 3.2, 1, 1.6, "#1c1c1c");
+  E(d + 4.5, 0, 1.4, 0.9, "#1c1c1c");
+  // руки: плечо → локоть → кисть
+  const shX = d + G.eyeToSh;
+  for (const sy of [-1, 1]) {
+    const sh = [shX, sy * 21];
+    let hand, elb;
+    if (P.gripOn) {
+      hand = [P.bx, sy * G.grip];
+      const low = Math.max(0, Math.min(1, (G.lockZ - P.bz) / (G.lockZ - G.chestZ)));   // 0 — локаут, 1 — грудь
+      elb = [(sh[0] + hand[0]) / 2 + 12 * low, sy * (31 + 5 * low)];      // локти под грифом, к корпусу ~60°
+    } else { elb = [shX + 22, sy * 27]; hand = [shX + 42, sy * 24]; }
+    line(g, [T(...sh), T(...elb), T(...hand)], B, 8 * s);
+    E(...hand, 4, 4, B);
+  }
+  // точка касания
+  E(d + G.eyeToTouch, 0, 2.2, 2.2, C.guide);
+}
+
+// ВИД СБОКУ: x → вправо, z → вверх
+function drawSide(P, trail) {
+  const { g, w, h } = fit(document.getElementById("side"));
+  const X0 = -30, X1 = 110, Z0 = 0, Z1 = 150;
+  const s = Math.min(w / (X1 - X0), h / (Z1 - Z0 + 8));
+  const ox = (w - (X1 - X0) * s) / 2 - X0 * s, oy = h - 6;
+  const T = (x, z) => [ox + x * s, oy - z * s];
+  // пол
+  line(g, [T(X0, 0), T(X1, 0)], C.line, 2);
+  // стойка и крюк
+  line(g, [T(G.upright, 0), T(G.upright, 140)], C.rack, 6 * s);
+  line(g, [T(G.upright, G.hookZ - 3), T(G.hookLip, G.hookZ - 3), T(G.hookLip, G.hookZ + 3)], C.rack, 3 * s);
+  // скамья
+  g.fillStyle = C.bench; g.fillRect(...T(G.benchFrom, G.benchTop), (G.benchTo - G.benchFrom) * s, 7 * s);
+  line(g, [T(10, 0), T(10, G.benchTop - 7)], C.bench, 4 * s); line(g, [T(80, 0), T(80, G.benchTop - 7)], C.bench, 4 * s);
+  // тело (профиль): голова, грудь с прогибом, таз
+  const d = P.eyeX, B = C.body;
+  g.fillStyle = B;
+  ell(g, ...T(d - 1, G.benchTop + 10), 11.5 * s, 9.5 * s); g.fill();
+  g.beginPath();
+  const prof = [[d + 10, G.benchTop + 2], [d + 10, G.benchTop + 14], [d + 18, G.benchTop + 18], [d + 30, G.benchTop + 25], [d + 40, G.benchTop + 27], [d + 52, G.benchTop + 22], [d + 64, G.benchTop + 16], [d + 80, G.benchTop + 14], [d + 82, G.benchTop + 2]];
+  prof.forEach((p, j) => { const q = T(...p); j ? g.lineTo(...q) : g.moveTo(...q); }); g.closePath(); g.fill();
+  // бедро и голень к полу
+  line(g, [T(d + 78, G.benchTop + 8), T(d + 112, G.benchTop + 4), T(d + 118, 2)], B, 12 * s);
+  // рука
+  const sh = [d + G.eyeToSh, G.benchTop + 16];
+  const hand = P.gripOn ? [P.bx, P.bz] : [d + 40, G.benchTop + 20];
+  const elb = P.gripOn ? [(sh[0] + hand[0]) / 2 + 3, (sh[1] + hand[1]) / 2 - Math.max(0, 16 - (hand[1] - sh[1]) * 0.25)] : [d + 30, G.benchTop + 18];
+  line(g, [T(...sh), T(...elb), T(...hand)], B, 7 * s);
+  // путь грифа
+  if (trail.length > 1) line(g, trail.map(p => T(p[0], p[1])), C.guide, 2.5);
+  // линия глаз
+  line(g, [T(d, G.benchTop + 18), T(d, 140)], C.warn, 1.5, [5, 5]);
+  // блин (полупрозрачный) и гриф
+  g.strokeStyle = C.plate; g.globalAlpha = 0.35; g.lineWidth = 2; ell(g, ...T(P.bx, P.bz), 22.5 * s, 22.5 * s); g.stroke(); g.globalAlpha = 1;
+  g.fillStyle = C.bar; ell(g, ...T(P.bx, P.bz), 2.4 * s, 2.4 * s); g.fill();
+  // зазор локаут — крюк
+  const lockX = d + G.eyeToSh, gap = lockX - G.hookLip;
+  if (P.i >= 3 && P.i <= 8) {
+    const z = G.hookZ + 12, a = T(G.hookLip, z), b = T(lockX, z);
+    line(g, [a, b], gap < 10 ? C.bad : C.fg, 1.5);
+    label(g, `${Math.round(gap)} см`, (a[0] + b[0]) / 2, a[1] - 9, gap < 10 ? C.bad : C.fg, "center");
+  }
+}
+
+// --- текст ---
+function overName(rel) {    // где гриф (на крюках) относительно лица: rel = гриф − глаза, + к ногам
+  if (rel < -9) return "макушкой";
+  if (rel < -4) return "лбом";
+  if (rel <= 2.5) return "глазами";
+  if (rel <= 6) return "носом";
+  if (rel <= 10) return "ртом";
+  if (rel <= 15) return "подбородком";
+  return "шеей";
+}
+function verdict(d) {
+  const un = d + G.eyeToSh, gap = un - G.hookLip;
+  if (gap < 10) return ["bad", `Слишком близко к стойкам: на локауте до крюков ${Math.round(gap)} см — при жиме к плечам гриф может задеть крюки.`];
+  if (un > 26) return ["bad", `Слишком далеко: съём ${Math.round(un)} см — руки уходят за голову, лопатки разводятся до первого повтора.`];
+  if (d < -4) return ["warn", "Ближе к стойкам, чем нужно: съём лёгкий, но запас до крюков маленький."];
+  if (d > 4) return ["warn", "Чуть дальше, чем нужно: съём длинноват, держи лопатки при снятии."];
+  return ["ok", "В самый раз: глаза под грифом, съём короткий, на локауте запас до крюков."];
+}
+function setD(v) {
+  dTarget = v; elD.value = v;
+  document.getElementById("dv").textContent = (v > 0 ? "+" : "") + v + " см";
+  document.querySelectorAll(".pos button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.d === v)));
+  const [cls, txt] = verdict(v), el = document.getElementById("verdict");
+  el.className = "verdict " + cls; el.textContent = txt;
+  const un = v + G.eyeToSh;
+  document.getElementById("r-over").textContent = overName(-v);
+  document.getElementById("r-un").textContent = Math.round(un) + " см";
+  document.getElementById("r-gap").textContent = Math.round(un - G.hookLip) + " см";
+  document.getElementById("r-touch").textContent = Math.round(v + G.eyeToTouch) + " см";
+  t = 0; trailTop = []; trailSide = [];
+}
+
+let trailTop = [], trailSide = [];
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (playing) t = (t + dt * +elSpeed.value) % TOTAL;
+  dCur += (dTarget - dCur) * Math.min(1, dt * 8);
+  const P = pose(t, dCur);
+  if (P.i >= 2 && P.i <= 8) { trailTop.push(P.bx); trailSide.push([P.bx, P.bz]); }
+  if (P.i <= 1) { trailTop = []; trailSide = []; }
+  if (trailTop.length > 600) { trailTop.shift(); trailSide.shift(); }
+  document.getElementById("pname").textContent = P.phase || "Отдых";
+  drawTop(P, trailTop.length ? [Math.min(...trailTop), Math.max(...trailTop)] : null);
+  drawSide(P, trailSide);
+  requestAnimationFrame(frame);
+}
+
+document.querySelectorAll(".pos button").forEach(b => b.onclick = () => setD(+b.dataset.d));
+elD.oninput = () => setD(+elD.value);
+document.getElementById("play").onclick = e => { playing = !playing; e.target.textContent = playing ? "Пауза" : "Пуск"; };
+if (matchMedia("(prefers-reduced-motion: reduce)").matches) elSpeed.value = 0.4;
+setD(0); dCur = 0;
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
